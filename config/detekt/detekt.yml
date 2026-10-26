@@ -10,6 +10,8 @@ style:
   UnusedPrivateMember:
     ignoreAnnotated: ["Preview"]
 complexity:
+  TooManyFunctions:
+    thresholdInClasses: 15
   LongParameterList:
     ignoreDefaultParameters: true
     ignoreAnnotated: ["Composable"]

@@ -18,7 +18,9 @@ import com.zapacit.cuzaai.auth.AgeRange
 import com.zapacit.cuzaai.auth.AuthApiException
 import com.zapacit.cuzaai.auth.AuthRepository
 import com.zapacit.cuzaai.auth.Provider
+import com.zapacit.cuzaai.testing.APPLE_CONFIG
 import com.zapacit.cuzaai.testing.FakeAgeSignals
+import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FakeAuthApi
 import com.zapacit.cuzaai.testing.FakeIdTokenProvider
 import com.zapacit.cuzaai.testing.InMemorySessionStore
@@ -41,10 +43,10 @@ class SignInFlowTest {
     private val store = InMemorySessionStore()
     private val ages = FakeAgeSignals()
     private val google = FakeIdTokenProvider()
-    private val apple = FakeIdTokenProvider()
+    private val apple = FakeAppleBrowser()
 
     private fun launch(fontScale: Float = 1f) {
-        val viewModel = AuthViewModel(AuthRepository(api, store, ages))
+        val viewModel = AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG))
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
                 ZapaKidTheme { ZapaKidApp(viewModel, google = google, apple = apple) }
@@ -105,6 +107,8 @@ class SignInFlowTest {
 
         compose.onNodeWithTag("agreement").assertIsDisplayed()
         assertEquals(Provider.APPLE, api.signIns.single().provider)
+        assertEquals("the browser opened Apple once", 1, apple.opened.size)
+        assertEquals(1, api.appleExchanges.size)
     }
 
     @Test

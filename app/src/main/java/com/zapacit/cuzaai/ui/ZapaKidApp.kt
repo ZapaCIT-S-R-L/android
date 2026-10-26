@@ -3,12 +3,12 @@ package com.zapacit.cuzaai.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zapacit.cuzaai.auth.Provider
+import com.zapacit.cuzaai.auth.signin.AppleBrowser
 import com.zapacit.cuzaai.auth.signin.IdTokenProvider
 
 /** The app's root: picks the screen for the sign-in state. */
 @Composable
-fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: IdTokenProvider) {
+fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: AppleBrowser) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     when (val s = state) {
         is AuthUiState.SignedOut ->
@@ -16,8 +16,8 @@ fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: IdToken
                 busy = s.busy,
                 error = s.error,
                 retryAfterSeconds = s.retryAfterSeconds,
-                onGoogle = { viewModel.signIn(Provider.GOOGLE, google) },
-                onApple = { viewModel.signIn(Provider.APPLE, apple) }
+                onGoogle = { viewModel.signInWithGoogle(google) },
+                onApple = { viewModel.signInWithApple(apple) }
             )
 
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
