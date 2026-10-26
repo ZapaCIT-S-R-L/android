@@ -1,0 +1,17 @@
+# Overrides on top of detekt's default rules (buildUponDefaultConfig = true).
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ["Composable"]
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    excludes: ["**/test/**", "**/androidTest/**", "**/ui/theme/**"]
+  UnusedPrivateMember:
+    ignoreAnnotated: ["Preview"]
+complexity:
+  LongParameterList:
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ["Composable"]
+  LongMethod:
+    ignoreAnnotated: ["Composable"]

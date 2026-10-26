@@ -1,0 +1,21 @@
+.DS_Store
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+node_modules/
+# Signing material and service files never go in the repository.
+*.jks
+*.keystore
+*.p12
+*.pem
+keystore.properties
+google-services.json
+service-account*.json
+.env
+*.env

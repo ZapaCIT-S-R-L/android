@@ -1,0 +1,29 @@
+# Dependency updates. CI must pass before merging, as for any PR.
+# Security updates: Dependabot security updates are on for this repo; they open a PR as soon as an advisory is
+# published (not tied to the schedule below). The groups keep them in their own PRs, separate from version bumps.
+# Version updates: weekly. Versions are pinned exactly in gradle/libs.versions.toml; actions are pinned by commit SHA.
+# A Gradle bump also needs gradle/verification-metadata.xml refreshed (see CONTRIBUTING.md); CI fails until it is.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      gradle-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      gradle:
+        applies-to: version-updates
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      actions:
+        applies-to: version-updates
+        patterns: ["*"]

@@ -1,0 +1,13 @@
+{
+  "name": "zapakid-android-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Repository scripts (CLA check, release version). The app itself builds with Gradle.",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,56 @@
+# Tags every merge to main vMAJOR.MINOR.PATCH (scripts/next-version.js) and publishes a GitHub release with the
+# SBOM (CycloneDX JSON) of the app's release runtime dependencies.
+#   no label -> patch, `minor` label on the merged PR -> minor, `major` label -> major.
+# No signing or Play upload yet: that comes in a later change with its own protected environment.
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # push the tag, create the release
+  pull-requests: read # read the merged PR's labels
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - run: npm test
+      - run: ./gradlew cyclonedxBom
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[0] // {}')
+          labels=$(jq -r '(.labels // [])[].name' <<<"$pr")
+          title=$(jq -r 'if .number then "PR #\(.number) \(.title)" else empty end' <<<"$pr")
+          # shellcheck disable=SC2086 # one argument per label
+          version=$(git tag -l | node scripts/next-version.js $labels)
+          message=${title:-$(git log -1 --format=%s "$SHA")}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$version" -m "$message" "$SHA"
+          git push origin "$version"
+          cp build/reports/cyclonedx/bom.json "zapakid-android-$version.cdx.json"
+          gh release create "$version" "zapakid-android-$version.cdx.json" --title "$version" --notes "$message" --verify-tag
+          echo "Released $version: $message" >> "$GITHUB_STEP_SUMMARY"
