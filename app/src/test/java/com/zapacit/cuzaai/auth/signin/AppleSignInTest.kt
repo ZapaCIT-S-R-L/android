@@ -1,80 +1,77 @@
 package com.zapacit.cuzaai.auth.signin
 
+import com.zapacit.cuzaai.testing.APPLE_CODE
+import com.zapacit.cuzaai.testing.APPLE_CONFIG
+import com.zapacit.cuzaai.testing.APPLE_STATE
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Sign in with Apple on Android is the web flow: a Custom Tab to Apple, back to the app through a verified link. */
+/**
+ * Sign in with Apple on Android: the web flow from the API contract (POST /v1/auth/apple/web). The app opens Apple
+ * with the API's state; the API's callback 303s to the App Link https://zapakid.ro/app/apple#code=...&state=...
+ */
 class AppleSignInTest {
-    private val config =
-        AppleSignInConfig(
-            servicesId = "ro.zapakid.signin",
-            redirectUri = "https://api-staging.zapakid.ro/v1/auth/apple/callback"
-        )
-
     private val providerNonce = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
     @Test
-    fun theAuthorizationUrlAsksForAnIdTokenWithStateAndTheHashedApiNonce() {
-        val request = AppleAuthorization.create(config, providerNonce)
-        val url = request.url.toHttpUrl()
+    fun theAuthorizationUrlFollowsTheContract() {
+        val url = AppleAuthorization.url(APPLE_CONFIG, state = APPLE_STATE, providerNonce = providerNonce).toHttpUrl()
 
+        assertEquals("https", url.scheme)
         assertEquals("appleid.apple.com", url.host)
         assertEquals("/auth/authorize", url.encodedPath)
         assertEquals("ro.zapakid.signin", url.queryParameter("client_id"))
-        assertEquals(config.redirectUri, url.queryParameter("redirect_uri"))
+        assertEquals("https://api-staging.zapakid.ro/v1/auth/apple/callback", url.queryParameter("redirect_uri"))
         assertEquals("code id_token", url.queryParameter("response_type"))
         assertEquals("form_post", url.queryParameter("response_mode"))
         assertEquals("name email", url.queryParameter("scope"))
-        assertEquals(request.state, url.queryParameter("state"))
+        assertEquals(APPLE_STATE, url.queryParameter("state"))
         assertEquals(providerNonce, url.queryParameter("nonce"))
     }
 
     @Test
-    fun stateIsRandomAndLongEnough() {
-        val a = AppleAuthorization.create(config, providerNonce)
-        val b = AppleAuthorization.create(config, providerNonce)
-        assertNotEquals(a.state, b.state)
-        assertTrue(a.state.length >= 32)
+    fun theStagingConfigUsesTheZapaKidServicesId() {
+        assertEquals("ro.zapakid.signin", AppleSignInConfig.STAGING.servicesId)
+        assertEquals("https://api-staging.zapakid.ro/v1/auth/apple/callback", AppleSignInConfig.STAGING.redirectUri)
     }
 
     @Test
-    fun theReturnWithTheRightStateGivesTheIdToken() {
-        val request = AppleAuthorization.create(config, providerNonce)
-        val result =
-            AppleAuthorization.parseReturn(
-                "https://zapakid.ro/app/apple#state=${request.state}&id_token=eyJ.abc.def&name=Ana%20Pop",
-                request
-            )
-        assertEquals(AppleReturn.Success(IdToken("eyJ.abc.def", displayName = "Ana Pop")), result)
+    fun theReturnWithTheRightStateGivesTheOneTimeCode() {
+        val result = AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#code=$APPLE_CODE&state=$APPLE_STATE", APPLE_STATE)
+        assertEquals(AppleReturn.Code(APPLE_CODE), result)
     }
 
     @Test
     fun aReturnWithAnotherStateIsRejected() {
-        val request = AppleAuthorization.create(config, providerNonce)
-        val result = AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#state=forged&id_token=eyJ", request)
+        val result = AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#code=$APPLE_CODE&state=forged", APPLE_STATE)
         assertEquals(AppleReturn.Rejected, result)
     }
 
     @Test
+    fun aReturnOnAnotherHostOrPathIsRejected() {
+        val fragment = "#code=$APPLE_CODE&state=$APPLE_STATE"
+        for (url in listOf("https://evil.example/app/apple", "https://zapakid.ro/app/other", "http://zapakid.ro/app/apple")) {
+            assertEquals(url, AppleReturn.Rejected, AppleAuthorization.parseReturn(url + fragment, APPLE_STATE))
+        }
+    }
+
+    @Test
     fun theUserCancellingAtAppleIsACancel() {
-        val request = AppleAuthorization.create(config, providerNonce)
         val result =
-            AppleAuthorization.parseReturn(
-                "https://zapakid.ro/app/apple#state=${request.state}&error=user_cancelled_authorize",
-                request
-            )
+            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#error=user_cancelled_authorize&state=$APPLE_STATE", APPLE_STATE)
         assertEquals(AppleReturn.Cancelled, result)
     }
 
     @Test
-    fun aReturnWithoutATokenIsRejected() {
-        val request = AppleAuthorization.create(config, providerNonce)
-        assertEquals(
-            AppleReturn.Rejected,
-            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#state=${request.state}", request)
-        )
+    fun anApiErrorIsPassedOn() {
+        val result =
+            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#error=provider_unavailable&state=$APPLE_STATE", APPLE_STATE)
+        assertEquals(AppleReturn.Error("provider_unavailable"), result)
+    }
+
+    @Test
+    fun aReturnWithoutACodeIsRejected() {
+        assertEquals(AppleReturn.Rejected, AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#state=$APPLE_STATE", APPLE_STATE))
     }
 }

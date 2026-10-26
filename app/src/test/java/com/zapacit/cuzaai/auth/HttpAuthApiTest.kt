@@ -1,5 +1,7 @@
 package com.zapacit.cuzaai.auth
 
+import com.zapacit.cuzaai.testing.APPLE_CODE
+import com.zapacit.cuzaai.testing.APPLE_STATE
 import com.zapacit.cuzaai.testing.NONCE
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -70,11 +72,9 @@ class HttpAuthApiTest {
         server.enqueue(MockResponse(code = 200, body = signedIn))
 
         val session =
-            api.signIn(
-                provider = Provider.GOOGLE,
-                token = "google-id-token",
+            api.signInWithGoogle(
+                idToken = "google-id-token",
                 nonce = NONCE,
-                displayName = null,
                 ageRange = AgeRange.shared(lower = 18, upper = null, platformStatus = "SHARED")
             )
 
@@ -99,32 +99,55 @@ class HttpAuthApiTest {
     }
 
     @Test
-    fun appleSignInSendsIdentityTokenAndDisplayName() = runTest {
-        server.enqueue(MockResponse(code = 200, body = signedIn))
+    fun appleWebStartSendsThePkceChallengeAndReturnsTheState() = runTest {
+        server.enqueue(MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}"""))
 
-        api.signIn(Provider.APPLE, "apple-id-token", NONCE, "Ana Pop", AgeRange.unavailable("API_NOT_AVAILABLE"))
+        assertEquals(APPLE_STATE, api.startAppleWeb(codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"))
 
         val request = server.takeRequest()
-        assertEquals("/v1/auth/apple", request.url.encodedPath)
+        assertEquals("POST", request.method)
+        assertEquals("/v1/auth/apple/web", request.url.encodedPath)
+        assertNull(request.headers["Authorization"])
         val sent = body(request.body!!.utf8())
-        assertEquals(setOf("identityToken", "nonce", "ageRange", "displayName"), sent.keys)
-        assertEquals("apple-id-token", sent["identityToken"]!!.jsonPrimitive.content)
-        assertEquals("Ana Pop", sent["displayName"]!!.jsonPrimitive.content)
-        val age = sent["ageRange"]!!.jsonObject
-        assertEquals("unavailable", age["availability"]!!.jsonPrimitive.content)
-        assertEquals(JsonNull, age["lowerBound"])
-        assertEquals(JsonNull, age["upperBound"])
+        assertEquals(setOf("codeChallenge", "codeChallengeMethod"), sent.keys)
+        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", sent["codeChallenge"]!!.jsonPrimitive.content)
+        assertEquals("S256", sent["codeChallengeMethod"]!!.jsonPrimitive.content)
     }
 
     @Test
-    fun aMissingDisplayNameIsLeftOut() = runTest {
+    fun appleExchangeTradesTheCodeAndVerifierForASession() = runTest {
         server.enqueue(MockResponse(code = 200, body = signedIn))
 
-        api.signIn(Provider.APPLE, "apple-id-token", NONCE, null, AgeRange.unavailable(null))
+        val session =
+            api.exchangeApple(
+                code = APPLE_CODE,
+                codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                nonce = NONCE,
+                ageRange = AgeRange.unavailable(null)
+            )
 
-        val sent = body(server.takeRequest().body!!.utf8())
-        assertFalse(sent.containsKey("displayName"))
-        assertFalse(sent["ageRange"]!!.jsonObject.containsKey("platformStatus"))
+        assertEquals("zks_tok", session.token)
+        val request = server.takeRequest()
+        assertEquals("/v1/auth/apple/exchange", request.url.encodedPath)
+        val sent = body(request.body!!.utf8())
+        assertEquals(setOf("code", "codeVerifier", "nonce", "ageRange"), sent.keys)
+        assertEquals(APPLE_CODE, sent["code"]!!.jsonPrimitive.content)
+        assertEquals("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", sent["codeVerifier"]!!.jsonPrimitive.content)
+        assertEquals(NONCE, sent["nonce"]!!.jsonPrimitive.content)
+        val age = sent["ageRange"]!!.jsonObject
+        assertEquals("unavailable", age["availability"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, age["lowerBound"])
+        assertFalse(age.containsKey("platformStatus"))
+    }
+
+    @Test
+    fun aUsedOrWrongAppleCodeIsInvalidCode() = runTest {
+        server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"invalid_code","message":"x"}}"""))
+
+        val e = expectError { api.exchangeApple(APPLE_CODE, "v".repeat(43), NONCE, AgeRange.unavailable(null)) }
+
+        assertEquals("invalid_code", e.code)
+        assertEquals(true, e.isInvalidTokenOrNonce)
     }
 
     @Test
@@ -133,7 +156,7 @@ class HttpAuthApiTest {
             MockResponse(code = 403, body = """{"error":{"code":"minor_not_allowed","message":"Adults only."}}""")
         )
 
-        val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
+        val e = expectError { api.signInWithGoogle("t", NONCE, AgeRange.unavailable(null)) }
 
         assertEquals(403, e.status)
         assertEquals("minor_not_allowed", e.code)
@@ -144,7 +167,7 @@ class HttpAuthApiTest {
     fun ageDeclinedIsReportedAsDeclined() = runTest {
         server.enqueue(MockResponse(code = 403, body = """{"error":{"code":"age_declined","message":"x"}}"""))
 
-        val e = expectError { api.signIn(Provider.APPLE, "t", NONCE, null, AgeRange.declined()) }
+        val e = expectError { api.exchangeApple(APPLE_CODE, "v".repeat(43), NONCE, AgeRange.declined()) }
 
         assertEquals(true, e.isAgeDeclined)
         assertEquals(false, e.isMinor)
@@ -154,7 +177,7 @@ class HttpAuthApiTest {
     fun aReplayedNonceIsInvalidNonce() = runTest {
         server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"invalid_nonce","message":"x"}}"""))
 
-        val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
+        val e = expectError { api.signInWithGoogle("t", NONCE, AgeRange.unavailable(null)) }
 
         assertEquals("invalid_nonce", e.code)
     }

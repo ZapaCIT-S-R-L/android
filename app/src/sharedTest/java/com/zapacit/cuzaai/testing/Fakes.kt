@@ -8,9 +8,12 @@ import com.zapacit.cuzaai.auth.Parent
 import com.zapacit.cuzaai.auth.Provider
 import com.zapacit.cuzaai.auth.Session
 import com.zapacit.cuzaai.auth.SessionStore
+import com.zapacit.cuzaai.auth.signin.AppleBrowser
+import com.zapacit.cuzaai.auth.signin.AppleSignInConfig
 import com.zapacit.cuzaai.auth.signin.IdToken
 import com.zapacit.cuzaai.auth.signin.IdTokenProvider
 import com.zapacit.cuzaai.auth.signin.SignInCancelled
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 val ANA = Parent(id = "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11", email = "ana@example.com", displayName = "Ana Pop")
 
@@ -18,6 +21,16 @@ const val FAR_FUTURE = "2099-01-01T00:00:00Z"
 
 /** A nonce in the contract's format (43 base64url characters). */
 const val NONCE = "n0nce-n0nce-n0nce-n0nce-n0nce-n0nce-n0nce-x"
+
+/** The flow state and one-time code the API hands out in the Apple web flow (43 base64url characters each). */
+const val APPLE_STATE = "st4te-st4te-st4te-st4te-st4te-st4te-st4te-x"
+const val APPLE_CODE = "c0de0-c0de0-c0de0-c0de0-c0de0-c0de0-c0de0-x"
+
+val APPLE_CONFIG =
+    AppleSignInConfig(
+        servicesId = "ro.zapakid.signin",
+        redirectUri = "https://api-staging.zapakid.ro/v1/auth/apple/callback",
+    )
 
 /** Stub backend: answers like the API contract, records what the app sent. */
 class FakeAuthApi(
@@ -95,5 +108,23 @@ class FakeIdTokenProvider(var token: IdToken? = IdToken(token = "provider-id-tok
     override suspend fun signIn(providerNonce: String): IdToken {
         providerNonces += providerNonce
         return token ?: throw SignInCancelled()
+    }
+}
+
+/**
+ * Stands in for the Custom Tab: records the Apple authorize URL and answers like the API's 303 to the App Link,
+ * echoing the state from the URL. [reply] builds the fragment from that state.
+ */
+class FakeAppleBrowser(
+    var reply: (state: String) -> String = { state -> "code=$APPLE_CODE&state=$state" },
+    var cancel: Boolean = false,
+) : AppleBrowser {
+    val opened = mutableListOf<String>()
+
+    override suspend fun authorize(url: String): String {
+        opened += url
+        if (cancel) throw SignInCancelled()
+        val state = url.toHttpUrl().queryParameter("state").orEmpty()
+        return "https://zapakid.ro/app/apple#${reply(state)}"
     }
 }

@@ -7,6 +7,8 @@ import com.zapacit.cuzaai.auth.Provider
 import com.zapacit.cuzaai.auth.Session
 import com.zapacit.cuzaai.auth.SignInError
 import com.zapacit.cuzaai.testing.ANA
+import com.zapacit.cuzaai.testing.APPLE_CONFIG
+import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FAR_FUTURE
 import com.zapacit.cuzaai.testing.FakeAgeSignals
 import com.zapacit.cuzaai.testing.FakeAuthApi
@@ -29,7 +31,7 @@ class AuthViewModelTest {
     private val store = InMemorySessionStore()
     private val ages = FakeAgeSignals()
     private val google = FakeIdTokenProvider()
-    private val apple = FakeIdTokenProvider()
+    private val apple = FakeAppleBrowser()
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -37,7 +39,7 @@ class AuthViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = AuthViewModel(AuthRepository(api, store, ages))
+    private fun viewModel() = AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG))
 
     @Test
     fun withoutASessionTheSignInScreenShows() = runTest {
@@ -54,7 +56,7 @@ class AuthViewModelTest {
     fun googleSignInShowsTheAgreementThenTheSignedInState() = runTest {
         val vm = viewModel()
 
-        vm.signIn(Provider.GOOGLE, google)
+        vm.signInWithGoogle(google)
         assertEquals(AuthUiState.Agreement(ANA), vm.state.value)
         assertEquals(Provider.GOOGLE, api.signIns.single().provider)
 
@@ -67,7 +69,7 @@ class AuthViewModelTest {
         ages.range = AgeRange.shared(13, 15, "SHARED")
         val vm = viewModel()
 
-        vm.signIn(Provider.GOOGLE, google)
+        vm.signInWithGoogle(google)
         assertEquals(AuthUiState.Blocked, vm.state.value)
 
         vm.backToSignIn()
@@ -79,7 +81,7 @@ class AuthViewModelTest {
         api.signInError = AuthApiException(403, "age_declined", "Declined.")
         val vm = viewModel()
 
-        vm.signIn(Provider.GOOGLE, google)
+        vm.signInWithGoogle(google)
         assertEquals(AuthUiState.AgeDeclined, vm.state.value)
 
         vm.backToSignIn()
@@ -91,7 +93,7 @@ class AuthViewModelTest {
         google.token = null
         val vm = viewModel()
 
-        vm.signIn(Provider.GOOGLE, google)
+        vm.signInWithGoogle(google)
 
         assertEquals(AuthUiState.SignedOut(), vm.state.value)
     }
@@ -101,7 +103,7 @@ class AuthViewModelTest {
         api.signInError = AuthApiException(500, "internal", "Boom")
         val vm = viewModel()
 
-        vm.signIn(Provider.APPLE, apple)
+        vm.signInWithApple(apple)
 
         assertEquals(AuthUiState.SignedOut(error = SignInError.SERVER), vm.state.value)
     }
@@ -111,7 +113,7 @@ class AuthViewModelTest {
         api.nonceError = AuthApiException(429, "rate_limited", "Slow down.", retryAfterSeconds = 120)
         val vm = viewModel()
 
-        vm.signIn(Provider.GOOGLE, google)
+        vm.signInWithGoogle(google)
 
         assertEquals(
             AuthUiState.SignedOut(error = SignInError.RATE_LIMITED, retryAfterSeconds = 120),
