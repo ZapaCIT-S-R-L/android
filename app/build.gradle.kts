@@ -13,12 +13,12 @@ fun quoted(property: String, default: String = ""): String {
 }
 
 android {
-    namespace = "com.zapacit.cuzaai"
+    namespace = "ro.zapakid.app"
     compileSdk = 37
 
     defaultConfig {
-        // Keep this id: the Play listing already exists under it.
-        applicationId = "com.zapacit.cuzaai"
+        // App id decided 2026-10-26 (its own Play Console app). test/app-id.test.js keeps the old one out.
+        applicationId = "ro.zapakid.app"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
