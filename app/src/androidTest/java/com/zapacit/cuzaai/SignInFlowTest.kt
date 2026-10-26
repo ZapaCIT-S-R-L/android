@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zapacit.cuzaai.auth.AgeRange
+import com.zapacit.cuzaai.auth.AuthApiException
 import com.zapacit.cuzaai.auth.AuthRepository
 import com.zapacit.cuzaai.auth.Provider
 import com.zapacit.cuzaai.testing.FakeAgeSignals
@@ -75,7 +76,7 @@ class SignInFlowTest {
 
     @Test
     fun googleSignInReachesTheSignedInStateAndSignOutReturns() {
-        ages.range = AgeRange(AgeRange.SOURCE_GOOGLE_PLAY, lower = 18, upper = null)
+        ages.range = AgeRange.shared(18, null, "SHARED")
         launch()
 
         compose.onNodeWithContentDescription("Sign in with Google").performClick()
@@ -86,13 +87,13 @@ class SignInFlowTest {
 
         compose.onNodeWithText("Signed in as Ana Pop").assertIsDisplayed()
         assertEquals(Provider.GOOGLE, api.signIns.single().provider)
-        assertEquals("session-token-1", store.session?.token)
+        assertEquals("zks_session-token-1", store.session?.token)
 
         compose.onNodeWithContentDescription("Sign out").assertHeightIsAtLeast(48.dp).performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Sign in with Google").assertIsDisplayed()
         assertNull(store.session)
-        assertEquals(listOf("session-token-1"), api.logouts)
+        assertEquals(listOf("zks_session-token-1"), api.logouts)
     }
 
     @Test
@@ -108,7 +109,7 @@ class SignInFlowTest {
 
     @Test
     fun aMinorSeesTheBlockedScreen() {
-        ages.range = AgeRange(AgeRange.SOURCE_GOOGLE_PLAY, lower = 13, upper = 15)
+        ages.range = AgeRange.shared(13, 15, "SHARED")
         launch()
 
         compose.onNodeWithContentDescription("Sign in with Google").performClick()
@@ -117,5 +118,30 @@ class SignInFlowTest {
         compose.onNodeWithTag("blocked").assertIsDisplayed()
         compose.onNodeWithText("ZapaKid accounts are for parents", substring = true).assertIsDisplayed()
         assertNull(store.session)
+    }
+
+    @Test
+    fun aDeclinedAgeSeesTheAgeDeclinedScreenAndCanTryAgain() {
+        api.signInError = AuthApiException(403, "age_declined", "Declined.")
+        launch()
+
+        compose.onNodeWithContentDescription("Sign in with Google").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("age-declined").assertIsDisplayed()
+        compose.onNodeWithText("Try again").assertHeightIsAtLeast(48.dp).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Sign in with Google").assertIsDisplayed()
+    }
+
+    @Test
+    fun rateLimitingTellsHowLongToWait() {
+        api.nonceError = AuthApiException(429, "rate_limited", "Slow down.", retryAfterSeconds = 120)
+        launch()
+
+        compose.onNodeWithContentDescription("Sign in with Google").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Try again in 2 minutes", substring = true).assertIsDisplayed()
     }
 }

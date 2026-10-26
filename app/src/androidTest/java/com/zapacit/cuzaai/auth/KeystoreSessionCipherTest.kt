@@ -39,7 +39,7 @@ class KeystoreSessionCipherTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = File(context.noBackupFilesDir, "test-session.bin")
         val store = EncryptedSessionStore(file, KeystoreSessionCipher(alias))
-        store.save(Session("tok", Parent("p_1", "Ana Pop", null)))
+        store.save(Session("zks_tok", "2099-01-01T00:00:00Z", Parent("p_1", null, "Ana Pop")))
 
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
 

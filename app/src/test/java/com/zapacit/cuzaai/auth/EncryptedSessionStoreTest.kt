@@ -18,7 +18,7 @@ class EncryptedSessionStoreTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private val session = Session("secret-session-token", Parent("p_1", "Ana Pop", "ana@example.com"))
+    private val session = Session("zks_secret-session-token", "2026-11-26T10:00:00Z", Parent("p_1", "ana@example.com", "Ana Pop"))
 
     @Test
     fun savedSessionLoadsBack() {
@@ -36,6 +36,7 @@ class EncryptedSessionStoreTest {
 
         val raw = file.readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(raw.contains("secret-session-token"))
+        assertFalse(raw.contains("zks_"))
         assertFalse(raw.contains("ana@example.com"))
         assertFalse(raw.contains("Ana Pop"))
     }
