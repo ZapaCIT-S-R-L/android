@@ -11,10 +11,15 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 /** [AuthApi] over HTTPS with OkHttp. Never logs request or response bodies (tokens). */
-class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient) : AuthApi {
+class HttpAuthApi(
+    private val baseUrl: HttpUrl,
+    private val client: OkHttpClient,
+    /** Play Integrity for sign-in requests; none in tests that don't need it. */
+    private val attestation: RequestAttestation? = null
+) : AuthApi {
     // Nullable fields without a default (ageRange bounds) are sent as null; ones with a default are left out.
     private val json = Json { ignoreUnknownKeys = true }
-    private val jsonType = "application/json".toMediaType()
+    private val jsonType = "application/json; charset=utf-8".toMediaType()
 
     override suspend fun nonce(): String {
         val request = Request.Builder().url(endpoint("auth/nonce")).post(EMPTY).build()
@@ -23,7 +28,7 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
 
     override suspend fun signInWithGoogle(idToken: String, nonce: String, ageRange: AgeRange): Session {
         val body = json.encodeToString(GoogleSignInRequest.serializer(), GoogleSignInRequest(idToken, nonce, ageRange))
-        return session(post("auth/google", body))
+        return session(post("auth/google", body, attest = true))
     }
 
     override suspend fun startAppleWeb(codeChallenge: String): String {
@@ -38,11 +43,25 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
                 AppleExchangeRequest.serializer(),
                 AppleExchangeRequest(code, codeVerifier, nonce, ageRange)
             )
-        return session(post("auth/apple/exchange", body))
+        return session(post("auth/apple/exchange", body, attest = true))
     }
 
-    private suspend fun post(path: String, body: String): String =
-        execute(Request.Builder().url(endpoint(path)).post(body.toRequestBody(jsonType)).build())
+    private suspend fun post(path: String, body: String, attest: Boolean = false): String {
+        val bytes = body.encodeToByteArray()
+        val request = Request.Builder().url(endpoint(path)).post(bytes.toRequestBody(jsonType))
+        if (attest) attestationToken(bytes)?.let { request.header(Attestation.HEADER, it) }
+        return execute(request.build())
+    }
+
+    /** Never fails the request: without a token the server applies its policy (403 attestation_failed). */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun attestationToken(body: ByteArray): String? = try {
+        attestation?.token(Attestation.requestHash(body))
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
 
     private fun session(text: String): Session {
         val response = json.decodeFromString(SignInResponse.serializer(), text)

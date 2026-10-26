@@ -12,6 +12,11 @@ fun quoted(property: String, default: String = ""): String {
     return "\"$value\""
 }
 
+fun cloudProjectNumber(): Long {
+    val value = providers.gradleProperty("zapakid.playCloudProjectNumber").getOrElse("0")
+    return requireNotNull(value.toLongOrNull()) { "zapakid.playCloudProjectNumber must be a number" }
+}
+
 android {
     namespace = "ro.zapakid.app"
     compileSdk = 37
@@ -33,6 +38,8 @@ android {
             "APPLE_SERVICES_ID",
             quoted("zapakid.appleServicesId", default = "ro.zapakid.signin")
         )
+        // Google Cloud project linked to Play Integrity in Play Console (public). 0 = not set up: no integrity token.
+        buildConfigField("long", "PLAY_CLOUD_PROJECT_NUMBER", "${cloudProjectNumber()}L")
         buildConfigField(
             "String",
             "APPLE_REDIRECT_URI",
@@ -100,6 +107,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.play.age.signals)
+    implementation(libs.play.integrity)
     implementation(libs.androidx.browser)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

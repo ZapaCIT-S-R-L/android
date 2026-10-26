@@ -25,4 +25,6 @@
     <string name="age_declined_title">Alter nicht geteilt</string>
     <string name="age_declined_body">ZapaKid muss bestätigen, dass Eltern mindestens 18 Jahre alt sind. Teile deine Altersgruppe, wenn du gefragt wirst, und versuche es dann noch einmal.</string>
     <string name="age_declined_try_again">Noch einmal versuchen</string>
+    <string name="attestation_failed_title">Dieses Handy kann nicht geprüft werden</string>
+    <string name="attestation_failed_body">Zum Schutz der Familien funktioniert ZapaKid nur, wenn es aus Google Play installiert ist, auf einem Handy, das die Prüfungen von Google besteht. Installiere ZapaKid aus Google Play, aktualisiere die Google Play-Dienste und versuche es noch einmal.</string>
 </resources>

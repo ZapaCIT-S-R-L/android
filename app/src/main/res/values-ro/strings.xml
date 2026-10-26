@@ -26,4 +26,6 @@
     <string name="age_declined_title">Vârsta nu a fost împărtășită</string>
     <string name="age_declined_body">ZapaKid trebuie să confirme că părinții au 18 ani sau mai mult. Împărtășește intervalul de vârstă când ți se cere, apoi încearcă din nou.</string>
     <string name="age_declined_try_again">Încearcă din nou</string>
+    <string name="attestation_failed_title">Telefonul nu poate fi verificat</string>
+    <string name="attestation_failed_body">Pentru siguranța familiilor, ZapaKid funcționează doar instalat din Google Play, pe un telefon care trece verificările Google. Instalează ZapaKid din Google Play, actualizează serviciile Google Play și încearcă din nou.</string>
 </resources>

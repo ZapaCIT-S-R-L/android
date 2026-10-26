@@ -16,6 +16,7 @@ import ro.zapakid.app.auth.EncryptedSessionStore
 import ro.zapakid.app.auth.HttpAuthApi
 import ro.zapakid.app.auth.KeystoreSessionCipher
 import ro.zapakid.app.auth.PlayAgeSignalsSource
+import ro.zapakid.app.auth.PlayIntegrityAttestation
 import ro.zapakid.app.auth.SessionStore
 import ro.zapakid.app.auth.Tls
 import ro.zapakid.app.auth.signin.AppleSignInConfig
@@ -48,7 +49,12 @@ class AppGraph(
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
-            api = api ?: HttpAuthApi(BuildConfig.API_BASE_URL.toHttpUrl(), http),
+            api =
+                api ?: HttpAuthApi(
+                    BuildConfig.API_BASE_URL.toHttpUrl(),
+                    http,
+                    PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+                ),
             store = store ?: EncryptedSessionStore(File(app.noBackupFilesDir, "session.bin"), KeystoreSessionCipher()),
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
             appleConfig = appleConfig

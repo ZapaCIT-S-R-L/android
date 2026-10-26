@@ -26,4 +26,6 @@
     <string name="age_declined_title">Age not shared</string>
     <string name="age_declined_body">ZapaKid needs to confirm that parents are 18 or older. Share your age range when you\'re asked, then try again.</string>
     <string name="age_declined_try_again">Try again</string>
+    <string name="attestation_failed_title">This phone can\'t be checked</string>
+    <string name="attestation_failed_body">To keep families safe, ZapaKid only works when installed from Google Play on a phone that passes Google\'s checks. Install ZapaKid from Google Play, update Google Play services, and try again.</string>
 </resources>

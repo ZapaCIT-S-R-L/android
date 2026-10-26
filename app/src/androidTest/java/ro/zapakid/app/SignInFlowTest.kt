@@ -148,4 +148,19 @@ class SignInFlowTest {
 
         compose.onNodeWithText("Try again in 2 minutes", substring = true).assertIsDisplayed()
     }
+
+    @Test
+    fun aFailedAppCheckExplainsAndOffersBack() {
+        api.signInError = AuthApiException(403, "attestation_failed", "Not genuine.")
+        launch()
+
+        compose.onNodeWithContentDescription("Sign in with Google").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("attestation-failed").assertIsDisplayed()
+        compose.onNodeWithText("Google Play", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Back").assertHeightIsAtLeast(48.dp).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Sign in with Google").assertIsDisplayed()
+    }
 }

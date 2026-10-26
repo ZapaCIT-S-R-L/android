@@ -188,3 +188,14 @@ fun AgeDeclinedScreen(onTryAgain: () -> Unit) {
         }
     }
 }
+
+@Composable
+fun AttestationFailedScreen(onBack: () -> Unit) {
+    ScreenColumn(tag = "attestation-failed") {
+        Title(stringResource(R.string.attestation_failed_title))
+        Text(stringResource(R.string.attestation_failed_body), textAlign = TextAlign.Center)
+        OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = MinTouchTarget)) {
+            Text(stringResource(R.string.blocked_back))
+        }
+    }
+}

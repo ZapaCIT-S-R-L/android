@@ -38,6 +38,7 @@ class AuthApiException(
 ) : Exception(message) {
     val isMinor: Boolean get() = code == "minor_not_allowed"
     val isAgeDeclined: Boolean get() = code == "age_declined"
+    val isAttestationFailed: Boolean get() = code == "attestation_failed"
     val isRateLimited: Boolean get() = status == HTTP_TOO_MANY_REQUESTS
     val isUnauthorized: Boolean get() = status == HTTP_UNAUTHORIZED
     val isInvalidTokenOrNonce: Boolean get() = code in setOf("invalid_nonce", "invalid_token", "invalid_code")

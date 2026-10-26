@@ -241,4 +241,83 @@ class HttpAuthApiTest {
 
         assertEquals(true, expectError { api.me("old") }.isUnauthorized)
     }
+
+    private class FakeAttestation(var token: String? = "integrity-token-1", var fail: Boolean = false) :
+        RequestAttestation {
+        val hashes = mutableListOf<String>()
+
+        override suspend fun token(requestHash: String): String? {
+            hashes += requestHash
+            if (fail) error("Play Integrity unavailable")
+            return token
+        }
+    }
+
+    private fun attested(attestation: RequestAttestation) =
+        HttpAuthApi(baseUrl = server.url("/v1/"), client = OkHttpClient(), attestation = attestation)
+
+    @Test
+    fun googleSignInCarriesAPlayIntegrityTokenBoundToTheExactBody() = runTest {
+        val attestation = FakeAttestation()
+        server.enqueue(MockResponse(code = 200, body = signedIn))
+
+        attested(attestation).signInWithGoogle("google-id-token", NONCE, AgeRange.unavailable(null))
+
+        val request = server.takeRequest()
+        assertEquals("integrity-token-1", request.headers["ZapaKid-Attestation"])
+        assertEquals(listOf(Attestation.requestHash(request.body!!.toByteArray())), attestation.hashes)
+    }
+
+    @Test
+    fun appleExchangeCarriesAPlayIntegrityTokenBoundToTheExactBody() = runTest {
+        val attestation = FakeAttestation()
+        server.enqueue(MockResponse(code = 200, body = signedIn))
+
+        attested(attestation).exchangeApple(APPLE_CODE, "v".repeat(43), NONCE, AgeRange.unavailable(null))
+
+        val request = server.takeRequest()
+        assertEquals("integrity-token-1", request.headers["ZapaKid-Attestation"])
+        assertEquals(listOf(Attestation.requestHash(request.body!!.toByteArray())), attestation.hashes)
+    }
+
+    @Test
+    fun onlySignInRequestsAreAttested() = runTest {
+        val attestation = FakeAttestation()
+        val api = attested(attestation)
+        server.enqueue(MockResponse(code = 200, body = """{"nonce":"$NONCE","expiresAt":"2026-10-26T10:10:00Z"}"""))
+        server.enqueue(
+            MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}""")
+        )
+        server.enqueue(MockResponse(code = 200, body = parentJson))
+        server.enqueue(MockResponse(code = 204, body = ""))
+
+        api.nonce()
+        api.startAppleWeb("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        api.me("zks_tok")
+        api.logout("zks_tok")
+
+        repeat(4) { assertNull(server.takeRequest().headers["ZapaKid-Attestation"]) }
+        assertEquals(emptyList<String>(), attestation.hashes)
+    }
+
+    @Test
+    fun withoutAnIntegrityTokenTheRequestGoesOutWithoutTheHeaderAndTheServerDecides() = runTest {
+        for (attestation in listOf(FakeAttestation(token = null), FakeAttestation(fail = true))) {
+            server.enqueue(MockResponse(code = 200, body = signedIn))
+
+            attested(attestation).signInWithGoogle("google-id-token", NONCE, AgeRange.unavailable(null))
+
+            assertNull(server.takeRequest().headers["ZapaKid-Attestation"])
+        }
+    }
+
+    @Test
+    fun attestationFailedIsReported() = runTest {
+        server.enqueue(MockResponse(code = 403, body = """{"error":{"code":"attestation_failed","message":"x"}}"""))
+
+        val e = expectError { api.signInWithGoogle("t", NONCE, AgeRange.unavailable(null)) }
+
+        assertEquals(true, e.isAttestationFailed)
+        assertEquals(false, e.isMinor)
+    }
 }

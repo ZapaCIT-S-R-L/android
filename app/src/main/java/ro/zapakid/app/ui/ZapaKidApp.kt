@@ -27,5 +27,7 @@ fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: AppleBr
         AuthUiState.Blocked -> BlockedScreen(onBack = viewModel::backToSignIn)
 
         AuthUiState.AgeDeclined -> AgeDeclinedScreen(onTryAgain = viewModel::backToSignIn)
+
+        AuthUiState.AttestationFailed -> AttestationFailedScreen(onBack = viewModel::backToSignIn)
     }
 }

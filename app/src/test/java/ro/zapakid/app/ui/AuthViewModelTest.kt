@@ -89,6 +89,18 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun aFailedAppCheckSeesItsOwnScreenAndCanGoBack() = runTest {
+        api.signInError = AuthApiException(403, "attestation_failed", "Not genuine.")
+        val vm = viewModel()
+
+        vm.signInWithGoogle(google)
+        assertEquals(AuthUiState.AttestationFailed, vm.state.value)
+
+        vm.backToSignIn()
+        assertEquals(AuthUiState.SignedOut(), vm.state.value)
+    }
+
+    @Test
     fun cancellingTheAccountSheetJustReturnsToSignIn() = runTest {
         google.token = null
         val vm = viewModel()
