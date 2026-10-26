@@ -29,6 +29,8 @@ sealed interface AuthUiState {
     data object Blocked : AuthUiState
 
     data object AgeDeclined : AuthUiState
+
+    data object AttestationFailed : AuthUiState
 }
 
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
@@ -63,6 +65,8 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
                     SignInResult.AgeDeclined -> AuthUiState.AgeDeclined
 
+                    SignInResult.AttestationFailed -> AuthUiState.AttestationFailed
+
                     SignInResult.Cancelled -> AuthUiState.SignedOut()
 
                     is SignInResult.Failed ->
@@ -78,10 +82,10 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         if (current is AuthUiState.Agreement) _state.value = AuthUiState.SignedIn(current.parent)
     }
 
-    /** From the blocked or age-declined screen. */
+    /** From the blocked, age-declined or app-check screen. */
     fun backToSignIn() {
         val current = _state.value
-        if (current == AuthUiState.Blocked || current == AuthUiState.AgeDeclined) _state.value = AuthUiState.SignedOut()
+        if (current in BACK_TO_SIGN_IN) _state.value = AuthUiState.SignedOut()
     }
 
     fun logout() {
@@ -91,3 +95,5 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         }
     }
 }
+
+private val BACK_TO_SIGN_IN = setOf(AuthUiState.Blocked, AuthUiState.AgeDeclined, AuthUiState.AttestationFailed)

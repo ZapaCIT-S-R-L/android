@@ -19,6 +19,9 @@ sealed interface SignInResult {
     /** Under 18 (minor_not_allowed): parent accounts are for adults only. */
     data object Blocked : SignInResult
 
+    /** The API couldn't verify a genuine app on a genuine phone (attestation_failed). */
+    data object AttestationFailed : SignInResult
+
     /** The parent declined to share an age range (age_declined). */
     data object AgeDeclined : SignInResult
 
@@ -85,6 +88,7 @@ class AuthRepository(
             when {
                 e.isMinor -> SignInResult.Blocked
                 e.isAgeDeclined -> SignInResult.AgeDeclined
+                e.isAttestationFailed -> SignInResult.AttestationFailed
                 e.isRateLimited -> SignInResult.Failed(SignInError.RATE_LIMITED, e.retryAfterSeconds)
                 e.isInvalidTokenOrNonce -> SignInResult.Failed(SignInError.PROVIDER)
                 else -> SignInResult.Failed(SignInError.SERVER)

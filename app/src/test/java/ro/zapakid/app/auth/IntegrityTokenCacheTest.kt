@@ -24,7 +24,7 @@ class IntegrityTokenCacheTest {
                 }
                 "token-$provider-$hash"
             },
-            isProviderInvalid = { it is Invalid },
+            isProviderInvalid = { it is Invalid }
         )
 
     @Test
@@ -59,7 +59,7 @@ class IntegrityTokenCacheTest {
             IntegrityTokenCache(
                 prepare = { if (failPrepare) error("offline") else 7 },
                 request = { provider, hash -> "token-$provider-$hash" },
-                isProviderInvalid = { false },
+                isProviderInvalid = { false }
             )
 
         assertNull(flaky.token("a"))
@@ -71,7 +71,7 @@ class IntegrityTokenCacheTest {
     fun requestHashIsLowercaseHexSha256OfTheBody() {
         assertEquals(
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-            Attestation.requestHash("abc".encodeToByteArray()),
+            Attestation.requestHash("abc".encodeToByteArray())
         )
     }
 }

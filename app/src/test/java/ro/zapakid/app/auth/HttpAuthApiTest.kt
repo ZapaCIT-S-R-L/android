@@ -285,7 +285,9 @@ class HttpAuthApiTest {
         val attestation = FakeAttestation()
         val api = attested(attestation)
         server.enqueue(MockResponse(code = 200, body = """{"nonce":"$NONCE","expiresAt":"2026-10-26T10:10:00Z"}"""))
-        server.enqueue(MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}"""))
+        server.enqueue(
+            MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}""")
+        )
         server.enqueue(MockResponse(code = 200, body = parentJson))
         server.enqueue(MockResponse(code = 204, body = ""))
 
