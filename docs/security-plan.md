@@ -46,17 +46,18 @@ Keystore's AES-GCM, nothing hand-made).
 - `FLAG_SECURE` on every chat, media and key-verification screen (no screenshots, no recents thumbnail, not shown
   on casts). Kid mode applies it app-wide.
 
-## Play Integrity (API endpoints are drafted in the API's openapi.yaml)
+## Play Integrity (required on sign-in from launch; API endpoints are drafts in openapi.yaml)
 
-1. App asks the API for a one-time nonce: `POST /v1/integrity/nonce` → `{nonce, expires_at}` (bound to the session
-   or the install).
-2. App calls the Standard Play Integrity API with a `requestHash` of the action (sign-in, kid pairing, key upload),
-   prepared once with the Cloud project number.
-3. App sends the token with the action: `X-Integrity-Token` header, or `POST /v1/integrity/verify`.
-4. API decodes it with Google (server-side, its own service account), checks package name, certificate digest,
-   `requestHash`, recency, `MEETS_DEVICE_INTEGRITY`, `PLAY_RECOGNIZED`, licensed app.
-5. Policy: fail closed for kid pairing and account creation; fail open with a flag (logged, rate-limited) for
-   message sending, so a broken Play service doesn't cut a family off.
+1. `POST /v1/attestation/challenge` → `{challenge, expiresAt}` (single use, 5 minutes, no session needed).
+2. The app requests a Standard Play Integrity token with `requestHash` = SHA-256 of the request it protects
+   (prepared once per app start with the Cloud project number), or a classic token with the challenge as nonce.
+3. `POST /v1/attestation/google {integrityToken, challenge}`, or the token in the `ZapaKid-Attestation` header on
+   the protected request (sign-in, kid pairing, key upload).
+4. The API decodes it with Google and requires `PLAY_RECOGNIZED`, package `com.zapacit.cuzaai`, the release signing
+   certificate, `MEETS_DEVICE_INTEGRITY`, `LICENSED` and a fresh matching hash or nonce. Failure: `403
+   attestation_failed`, and the app shows a clear "this app or phone can't be verified" screen.
+5. Fails closed on sign-in, account creation and kid pairing. Emulator and debug builds can't pass, so CI tests use
+   the stubbed API; a staging-only allowlist for test devices is an API decision.
 
 Needs from Stefan: Play Integrity enabled in Play Console, linked Google Cloud project number.
 
