@@ -12,28 +12,41 @@ import okhttp3.Response
 
 /** [AuthApi] over HTTPS with OkHttp. Never logs request or response bodies (tokens). */
 class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient) : AuthApi {
-    private val json =
-        Json {
-            ignoreUnknownKeys = true
-            explicitNulls = false
-        }
+    // Nullable fields without a default (ageRange bounds) are sent as null; ones with a default are left out.
+    private val json = Json { ignoreUnknownKeys = true }
     private val jsonType = "application/json".toMediaType()
+
+    override suspend fun nonce(): String {
+        val request = Request.Builder().url(endpoint("auth/nonce")).post(EMPTY).build()
+        return json.decodeFromString(NonceResponse.serializer(), execute(request)).nonce
+    }
 
     override suspend fun signIn(
         provider: Provider,
-        idToken: String,
-        nonce: String?,
-        name: String?,
+        token: String,
+        nonce: String,
+        displayName: String?,
         ageRange: AgeRange
     ): Session {
-        val body = json.encodeToString(SignInRequest.serializer(), SignInRequest(idToken, nonce, name, ageRange))
+        val body =
+            when (provider) {
+                Provider.GOOGLE ->
+                    json.encodeToString(GoogleSignInRequest.serializer(), GoogleSignInRequest(token, nonce, ageRange))
+
+                Provider.APPLE ->
+                    json.encodeToString(
+                        AppleSignInRequest.serializer(),
+                        AppleSignInRequest(token, nonce, ageRange, displayName)
+                    )
+            }
         val request =
             Request
                 .Builder()
                 .url(endpoint("auth/${provider.path}"))
                 .post(body.toRequestBody(jsonType))
                 .build()
-        return json.decodeFromString(Session.serializer(), execute(request))
+        val response = json.decodeFromString(SignInResponse.serializer(), execute(request))
+        return Session(response.session.token, response.session.expiresAt, response.parent)
     }
 
     override suspend fun me(token: String): Parent {
@@ -44,7 +57,7 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
                 .header("Authorization", "Bearer $token")
                 .get()
                 .build()
-        return json.decodeFromString(MeResponse.serializer(), execute(request)).parent
+        return json.decodeFromString(Parent.serializer(), execute(request))
     }
 
     override suspend fun logout(token: String) {
@@ -53,7 +66,7 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
                 .Builder()
                 .url(endpoint("auth/logout"))
                 .header("Authorization", "Bearer $token")
-                .post(ByteArray(0).toRequestBody(null))
+                .post(EMPTY)
                 .build()
         execute(request)
     }
@@ -73,8 +86,13 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
         val error = runCatching { json.decodeFromString(ErrorBody.serializer(), text) }.getOrNull()
         throw AuthApiException(
             status = response.code,
-            code = error?.error ?: "http_${response.code}",
-            message = error?.message ?: "Server error ${response.code}"
+            code = error?.error?.code ?: "http_${response.code}",
+            message = error?.error?.message ?: "Server error ${response.code}",
+            retryAfterSeconds = response.header("Retry-After")?.trim()?.toLongOrNull()
         )
+    }
+
+    private companion object {
+        val EMPTY = ByteArray(0).toRequestBody(null)
     }
 }

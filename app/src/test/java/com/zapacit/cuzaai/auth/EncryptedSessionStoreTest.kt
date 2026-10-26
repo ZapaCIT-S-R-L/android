@@ -18,7 +18,8 @@ class EncryptedSessionStoreTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private val session = Session("zks_secret-session-token", "2026-11-26T10:00:00Z", Parent("p_1", "ana@example.com", "Ana Pop"))
+    private val session =
+        Session("zks_secret-session-token", "2026-11-26T10:00:00Z", Parent("p_1", "ana@example.com", "Ana Pop"))
 
     @Test
     fun savedSessionLoadsBack() {

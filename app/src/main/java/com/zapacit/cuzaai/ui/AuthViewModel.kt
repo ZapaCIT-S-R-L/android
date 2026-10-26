@@ -8,16 +8,18 @@ import com.zapacit.cuzaai.auth.Provider
 import com.zapacit.cuzaai.auth.SignInError
 import com.zapacit.cuzaai.auth.SignInResult
 import com.zapacit.cuzaai.auth.signin.IdTokenProvider
-import com.zapacit.cuzaai.auth.signin.SignInCancelled
-import com.zapacit.cuzaai.auth.signin.SignInFailed
-import com.zapacit.cuzaai.auth.signin.SignInNotConfigured
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 sealed interface AuthUiState {
-    data class SignedOut(val error: SignInError? = null, val busy: Boolean = false) : AuthUiState
+    data class SignedOut(
+        val error: SignInError? = null,
+        val busy: Boolean = false,
+        /** With [SignInError.RATE_LIMITED]: how long to wait, from Retry-After. */
+        val retryAfterSeconds: Long? = null
+    ) : AuthUiState
 
     /** Signed in, before the parental agreement is accepted. */
     data class Agreement(val parent: Parent) : AuthUiState
@@ -25,6 +27,8 @@ sealed interface AuthUiState {
     data class SignedIn(val parent: Parent) : AuthUiState
 
     data object Blocked : AuthUiState
+
+    data object AgeDeclined : AuthUiState
 }
 
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
@@ -47,24 +51,18 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         if ((_state.value as? AuthUiState.SignedOut)?.busy == true) return
         _state.value = AuthUiState.SignedOut(busy = true)
         viewModelScope.launch {
-            val token =
-                try {
-                    tokens.signIn()
-                } catch (ignored: SignInCancelled) {
-                    _state.value = AuthUiState.SignedOut()
-                    return@launch
-                } catch (ignored: SignInNotConfigured) {
-                    _state.value = AuthUiState.SignedOut(error = SignInError.NOT_CONFIGURED)
-                    return@launch
-                } catch (ignored: SignInFailed) {
-                    _state.value = AuthUiState.SignedOut(error = SignInError.PROVIDER)
-                    return@launch
-                }
             _state.value =
-                when (val result = repository.signIn(provider, token.idToken, token.nonce, token.name)) {
+                when (val result = repository.signIn(provider, tokens)) {
                     is SignInResult.SignedIn -> AuthUiState.Agreement(result.parent)
+
                     SignInResult.Blocked -> AuthUiState.Blocked
-                    is SignInResult.Failed -> AuthUiState.SignedOut(error = result.error)
+
+                    SignInResult.AgeDeclined -> AuthUiState.AgeDeclined
+
+                    SignInResult.Cancelled -> AuthUiState.SignedOut()
+
+                    is SignInResult.Failed ->
+                        AuthUiState.SignedOut(error = result.error, retryAfterSeconds = result.retryAfterSeconds)
                 }
         }
     }
@@ -76,8 +74,10 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         if (current is AuthUiState.Agreement) _state.value = AuthUiState.SignedIn(current.parent)
     }
 
-    fun dismissBlocked() {
-        if (_state.value == AuthUiState.Blocked) _state.value = AuthUiState.SignedOut()
+    /** From the blocked or age-declined screen. */
+    fun backToSignIn() {
+        val current = _state.value
+        if (current == AuthUiState.Blocked || current == AuthUiState.AgeDeclined) _state.value = AuthUiState.SignedOut()
     }
 
     fun logout() {

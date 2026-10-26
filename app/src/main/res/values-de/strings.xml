@@ -17,4 +17,12 @@
     <string name="blocked_title">Nur für Eltern</string>
     <string name="blocked_body">ZapaKid-Konten sind für Eltern (ab 18 Jahren). Bitte deine Eltern, ZapaKid einzurichten und dich mit einem QR-Code hinzuzufügen.</string>
     <string name="blocked_back">Zurück</string>
+    <string name="error_rate_limited">Zu viele Anmeldeversuche. Versuche es später noch einmal.</string>
+    <plurals name="error_rate_limited_minutes">
+        <item quantity="one">Zu viele Anmeldeversuche. Versuche es in %d Minute noch einmal.</item>
+        <item quantity="other">Zu viele Anmeldeversuche. Versuche es in %d Minuten noch einmal.</item>
+    </plurals>
+    <string name="age_declined_title">Alter nicht geteilt</string>
+    <string name="age_declined_body">ZapaKid muss bestätigen, dass Eltern mindestens 18 Jahre alt sind. Teile deine Altersgruppe, wenn du gefragt wirst, und versuche es dann noch einmal.</string>
+    <string name="age_declined_try_again">Noch einmal versuchen</string>
 </resources>

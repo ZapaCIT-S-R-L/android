@@ -54,178 +54,166 @@ class HttpAuthApiTest {
     }
 
     @Test
-    fun nonceIsFetchedWithoutASession() =
-        runTest {
-            server.enqueue(MockResponse(code = 200, body = """{"nonce":"$NONCE","expiresAt":"2026-10-26T10:10:00Z"}"""))
+    fun nonceIsFetchedWithoutASession() = runTest {
+        server.enqueue(MockResponse(code = 200, body = """{"nonce":"$NONCE","expiresAt":"2026-10-26T10:10:00Z"}"""))
 
-            assertEquals(NONCE, api.nonce())
+        assertEquals(NONCE, api.nonce())
 
-            val request = server.takeRequest()
-            assertEquals("POST", request.method)
-            assertEquals("/v1/auth/nonce", request.url.encodedPath)
-            assertNull(request.headers["Authorization"])
-        }
-
-    @Test
-    fun googleSignInSendsIdTokenNonceAndAgeRangeAndReturnsTheSession() =
-        runTest {
-            server.enqueue(MockResponse(code = 200, body = signedIn))
-
-            val session =
-                api.signIn(
-                    provider = Provider.GOOGLE,
-                    token = "google-id-token",
-                    nonce = NONCE,
-                    displayName = null,
-                    ageRange = AgeRange.shared(lower = 18, upper = null, platformStatus = "SHARED"),
-                )
-
-            assertEquals("zks_tok", session.token)
-            assertEquals("2026-11-26T10:00:00Z", session.expiresAt)
-            assertEquals(Parent("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11", "ana@example.com", "Ana Pop"), session.parent)
-            val request = server.takeRequest()
-            assertEquals("POST", request.method)
-            assertEquals("/v1/auth/google", request.url.encodedPath)
-            assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
-            assertNull("no session yet, so no Authorization header", request.headers["Authorization"])
-            val sent = body(request.body!!.utf8())
-            assertEquals(setOf("idToken", "nonce", "ageRange"), sent.keys)
-            assertEquals("google-id-token", sent["idToken"]!!.jsonPrimitive.content)
-            assertEquals(NONCE, sent["nonce"]!!.jsonPrimitive.content)
-            val age = sent["ageRange"]!!.jsonObject
-            assertEquals("shared", age["availability"]!!.jsonPrimitive.content)
-            assertEquals("google_play_age_signals", age["source"]!!.jsonPrimitive.content)
-            assertEquals(18, age["lowerBound"]!!.jsonPrimitive.int)
-            assertEquals("required, so sent as null", JsonNull, age["upperBound"])
-            assertEquals("SHARED", age["platformStatus"]!!.jsonPrimitive.content)
-        }
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/auth/nonce", request.url.encodedPath)
+        assertNull(request.headers["Authorization"])
+    }
 
     @Test
-    fun appleSignInSendsIdentityTokenAndDisplayName() =
-        runTest {
-            server.enqueue(MockResponse(code = 200, body = signedIn))
+    fun googleSignInSendsIdTokenNonceAndAgeRangeAndReturnsTheSession() = runTest {
+        server.enqueue(MockResponse(code = 200, body = signedIn))
 
-            api.signIn(Provider.APPLE, "apple-id-token", NONCE, "Ana Pop", AgeRange.unavailable("API_NOT_AVAILABLE"))
-
-            val request = server.takeRequest()
-            assertEquals("/v1/auth/apple", request.url.encodedPath)
-            val sent = body(request.body!!.utf8())
-            assertEquals(setOf("identityToken", "nonce", "ageRange", "displayName"), sent.keys)
-            assertEquals("apple-id-token", sent["identityToken"]!!.jsonPrimitive.content)
-            assertEquals("Ana Pop", sent["displayName"]!!.jsonPrimitive.content)
-            val age = sent["ageRange"]!!.jsonObject
-            assertEquals("unavailable", age["availability"]!!.jsonPrimitive.content)
-            assertEquals(JsonNull, age["lowerBound"])
-            assertEquals(JsonNull, age["upperBound"])
-        }
-
-    @Test
-    fun aMissingDisplayNameIsLeftOut() =
-        runTest {
-            server.enqueue(MockResponse(code = 200, body = signedIn))
-
-            api.signIn(Provider.APPLE, "apple-id-token", NONCE, null, AgeRange.unavailable(null))
-
-            val sent = body(server.takeRequest().body!!.utf8())
-            assertFalse(sent.containsKey("displayName"))
-            assertFalse(sent["ageRange"]!!.jsonObject.containsKey("platformStatus"))
-        }
-
-    @Test
-    fun minorNotAllowedIsReportedAsMinor() =
-        runTest {
-            server.enqueue(
-                MockResponse(code = 403, body = """{"error":{"code":"minor_not_allowed","message":"Adults only."}}"""),
+        val session =
+            api.signIn(
+                provider = Provider.GOOGLE,
+                token = "google-id-token",
+                nonce = NONCE,
+                displayName = null,
+                ageRange = AgeRange.shared(lower = 18, upper = null, platformStatus = "SHARED")
             )
 
-            val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
-
-            assertEquals(403, e.status)
-            assertEquals("minor_not_allowed", e.code)
-            assertEquals(true, e.isMinor)
-        }
-
-    @Test
-    fun ageDeclinedIsReportedAsDeclined() =
-        runTest {
-            server.enqueue(MockResponse(code = 403, body = """{"error":{"code":"age_declined","message":"x"}}"""))
-
-            val e = expectError { api.signIn(Provider.APPLE, "t", NONCE, null, AgeRange.declined()) }
-
-            assertEquals(true, e.isAgeDeclined)
-            assertEquals(false, e.isMinor)
-        }
-
-    @Test
-    fun aReplayedNonceIsInvalidNonce() =
-        runTest {
-            server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"invalid_nonce","message":"x"}}"""))
-
-            val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
-
-            assertEquals("invalid_nonce", e.code)
-        }
+        assertEquals("zks_tok", session.token)
+        assertEquals("2026-11-26T10:00:00Z", session.expiresAt)
+        assertEquals(Parent("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11", "ana@example.com", "Ana Pop"), session.parent)
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/auth/google", request.url.encodedPath)
+        assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
+        assertNull("no session yet, so no Authorization header", request.headers["Authorization"])
+        val sent = body(request.body!!.utf8())
+        assertEquals(setOf("idToken", "nonce", "ageRange"), sent.keys)
+        assertEquals("google-id-token", sent["idToken"]!!.jsonPrimitive.content)
+        assertEquals(NONCE, sent["nonce"]!!.jsonPrimitive.content)
+        val age = sent["ageRange"]!!.jsonObject
+        assertEquals("shared", age["availability"]!!.jsonPrimitive.content)
+        assertEquals("google_play_age_signals", age["source"]!!.jsonPrimitive.content)
+        assertEquals(18, age["lowerBound"]!!.jsonPrimitive.int)
+        assertEquals("required, so sent as null", JsonNull, age["upperBound"])
+        assertEquals("SHARED", age["platformStatus"]!!.jsonPrimitive.content)
+    }
 
     @Test
-    fun rateLimitedCarriesRetryAfter() =
-        runTest {
-            server.enqueue(
-                MockResponse(
-                    code = 429,
-                    headers = headersOf("Retry-After", "120"),
-                    body = """{"error":{"code":"rate_limited","message":"Slow down."}}""",
-                ),
+    fun appleSignInSendsIdentityTokenAndDisplayName() = runTest {
+        server.enqueue(MockResponse(code = 200, body = signedIn))
+
+        api.signIn(Provider.APPLE, "apple-id-token", NONCE, "Ana Pop", AgeRange.unavailable("API_NOT_AVAILABLE"))
+
+        val request = server.takeRequest()
+        assertEquals("/v1/auth/apple", request.url.encodedPath)
+        val sent = body(request.body!!.utf8())
+        assertEquals(setOf("identityToken", "nonce", "ageRange", "displayName"), sent.keys)
+        assertEquals("apple-id-token", sent["identityToken"]!!.jsonPrimitive.content)
+        assertEquals("Ana Pop", sent["displayName"]!!.jsonPrimitive.content)
+        val age = sent["ageRange"]!!.jsonObject
+        assertEquals("unavailable", age["availability"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, age["lowerBound"])
+        assertEquals(JsonNull, age["upperBound"])
+    }
+
+    @Test
+    fun aMissingDisplayNameIsLeftOut() = runTest {
+        server.enqueue(MockResponse(code = 200, body = signedIn))
+
+        api.signIn(Provider.APPLE, "apple-id-token", NONCE, null, AgeRange.unavailable(null))
+
+        val sent = body(server.takeRequest().body!!.utf8())
+        assertFalse(sent.containsKey("displayName"))
+        assertFalse(sent["ageRange"]!!.jsonObject.containsKey("platformStatus"))
+    }
+
+    @Test
+    fun minorNotAllowedIsReportedAsMinor() = runTest {
+        server.enqueue(
+            MockResponse(code = 403, body = """{"error":{"code":"minor_not_allowed","message":"Adults only."}}""")
+        )
+
+        val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
+
+        assertEquals(403, e.status)
+        assertEquals("minor_not_allowed", e.code)
+        assertEquals(true, e.isMinor)
+    }
+
+    @Test
+    fun ageDeclinedIsReportedAsDeclined() = runTest {
+        server.enqueue(MockResponse(code = 403, body = """{"error":{"code":"age_declined","message":"x"}}"""))
+
+        val e = expectError { api.signIn(Provider.APPLE, "t", NONCE, null, AgeRange.declined()) }
+
+        assertEquals(true, e.isAgeDeclined)
+        assertEquals(false, e.isMinor)
+    }
+
+    @Test
+    fun aReplayedNonceIsInvalidNonce() = runTest {
+        server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"invalid_nonce","message":"x"}}"""))
+
+        val e = expectError { api.signIn(Provider.GOOGLE, "t", NONCE, null, AgeRange.unavailable(null)) }
+
+        assertEquals("invalid_nonce", e.code)
+    }
+
+    @Test
+    fun rateLimitedCarriesRetryAfter() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 429,
+                headers = headersOf("Retry-After", "120"),
+                body = """{"error":{"code":"rate_limited","message":"Slow down."}}"""
             )
+        )
 
-            val e = expectError { api.nonce() }
+        val e = expectError { api.nonce() }
 
-            assertEquals(true, e.isRateLimited)
-            assertEquals(120L, e.retryAfterSeconds)
-        }
-
-    @Test
-    fun anErrorWithoutAJsonBodyStillHasACode() =
-        runTest {
-            server.enqueue(MockResponse(code = 502, body = "<html>Bad gateway</html>"))
-
-            val e = expectError { api.me("zks_tok") }
-
-            assertEquals(502, e.status)
-            assertEquals("http_502", e.code)
-        }
+        assertEquals(true, e.isRateLimited)
+        assertEquals(120L, e.retryAfterSeconds)
+    }
 
     @Test
-    fun meSendsTheSessionAsABearerTokenAndReadsTheParent() =
-        runTest {
-            server.enqueue(MockResponse(code = 200, body = parentJson))
+    fun anErrorWithoutAJsonBodyStillHasACode() = runTest {
+        server.enqueue(MockResponse(code = 502, body = "<html>Bad gateway</html>"))
 
-            val parent = api.me("zks_tok")
+        val e = expectError { api.me("zks_tok") }
 
-            assertEquals("Ana Pop", parent.displayName)
-            val request = server.takeRequest()
-            assertEquals("GET", request.method)
-            assertEquals("/v1/me", request.url.encodedPath)
-            assertEquals("Bearer zks_tok", request.headers["Authorization"])
-        }
+        assertEquals(502, e.status)
+        assertEquals("http_502", e.code)
+    }
 
     @Test
-    fun logoutPostsWithTheBearerToken() =
-        runTest {
-            server.enqueue(MockResponse(code = 204, body = ""))
+    fun meSendsTheSessionAsABearerTokenAndReadsTheParent() = runTest {
+        server.enqueue(MockResponse(code = 200, body = parentJson))
 
-            api.logout("zks_tok")
+        val parent = api.me("zks_tok")
 
-            val request = server.takeRequest()
-            assertEquals("POST", request.method)
-            assertEquals("/v1/auth/logout", request.url.encodedPath)
-            assertEquals("Bearer zks_tok", request.headers["Authorization"])
-        }
+        assertEquals("Ana Pop", parent.displayName)
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/v1/me", request.url.encodedPath)
+        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+    }
 
     @Test
-    fun anExpiredSessionIsReportedAsUnauthorized() =
-        runTest {
-            server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"unauthorized","message":"x"}}"""))
+    fun logoutPostsWithTheBearerToken() = runTest {
+        server.enqueue(MockResponse(code = 204, body = ""))
 
-            assertEquals(true, expectError { api.me("old") }.isUnauthorized)
-        }
+        api.logout("zks_tok")
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/auth/logout", request.url.encodedPath)
+        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+    }
+
+    @Test
+    fun anExpiredSessionIsReportedAsUnauthorized() = runTest {
+        server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"unauthorized","message":"x"}}"""))
+
+        assertEquals(true, expectError { api.me("old") }.isUnauthorized)
+    }
 }

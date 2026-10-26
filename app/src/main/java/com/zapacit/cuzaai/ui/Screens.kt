@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -64,7 +65,13 @@ private fun Title(text: String) {
 }
 
 @Composable
-fun SignInScreen(busy: Boolean, error: SignInError?, onGoogle: () -> Unit, onApple: () -> Unit) {
+fun SignInScreen(
+    busy: Boolean,
+    error: SignInError?,
+    retryAfterSeconds: Long?,
+    onGoogle: () -> Unit,
+    onApple: () -> Unit
+) {
     ScreenColumn(tag = "sign-in") {
         Title(stringResource(R.string.app_name))
         Text(stringResource(R.string.sign_in_intro), textAlign = TextAlign.Center)
@@ -99,7 +106,7 @@ fun SignInScreen(busy: Boolean, error: SignInError?, onGoogle: () -> Unit, onApp
         }
         if (error != null) {
             Text(
-                text = stringResource(error.message()),
+                text = errorText(error, retryAfterSeconds),
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
@@ -108,11 +115,23 @@ fun SignInScreen(busy: Boolean, error: SignInError?, onGoogle: () -> Unit, onApp
     }
 }
 
+@Composable
+private fun errorText(error: SignInError, retryAfterSeconds: Long?): String {
+    if (error == SignInError.RATE_LIMITED && retryAfterSeconds != null) {
+        val minutes = ((retryAfterSeconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE).coerceAtLeast(1).toInt()
+        return pluralStringResource(R.plurals.error_rate_limited_minutes, minutes, minutes)
+    }
+    return stringResource(error.message())
+}
+
+private const val SECONDS_PER_MINUTE = 60L
+
 private fun SignInError.message(): Int = when (this) {
     SignInError.NETWORK -> R.string.error_network
     SignInError.SERVER -> R.string.error_server
     SignInError.NOT_CONFIGURED -> R.string.error_not_configured
     SignInError.PROVIDER -> R.string.error_provider
+    SignInError.RATE_LIMITED -> R.string.error_rate_limited
 }
 
 /**
@@ -134,7 +153,7 @@ fun AgreementScreen(onContinue: () -> Unit) {
 fun HomeScreen(parent: Parent, onSignOut: () -> Unit) {
     ScreenColumn(tag = "home") {
         Title(stringResource(R.string.app_name))
-        val who = parent.name ?: parent.email
+        val who = parent.displayName ?: parent.email
         Text(
             text = if (who != null) stringResource(R.string.signed_in_as, who) else stringResource(R.string.signed_in),
             style = MaterialTheme.typography.bodyLarge,
@@ -155,6 +174,17 @@ fun BlockedScreen(onBack: () -> Unit) {
         Text(stringResource(R.string.blocked_body), textAlign = TextAlign.Center)
         OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = MinTouchTarget)) {
             Text(stringResource(R.string.blocked_back))
+        }
+    }
+}
+
+@Composable
+fun AgeDeclinedScreen(onTryAgain: () -> Unit) {
+    ScreenColumn(tag = "age-declined") {
+        Title(stringResource(R.string.age_declined_title))
+        Text(stringResource(R.string.age_declined_body), textAlign = TextAlign.Center)
+        Button(onClick = onTryAgain, modifier = Modifier.heightIn(min = MinTouchTarget)) {
+            Text(stringResource(R.string.age_declined_try_again))
         }
     }
 }

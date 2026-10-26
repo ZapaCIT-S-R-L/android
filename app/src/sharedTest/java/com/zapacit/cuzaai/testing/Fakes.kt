@@ -24,14 +24,14 @@ class FakeAuthApi(
     var nonceError: Exception? = null,
     var signInError: AuthApiException? = null,
     var meError: Exception? = null,
-    var logoutError: Exception? = null,
+    var logoutError: Exception? = null
 ) : AuthApi {
     data class SignInCall(
         val provider: Provider,
         val token: String,
         val nonce: String,
         val displayName: String?,
-        val ageRange: AgeRange,
+        val ageRange: AgeRange
     )
 
     var noncesIssued = 0
@@ -49,7 +49,7 @@ class FakeAuthApi(
         token: String,
         nonce: String,
         displayName: String?,
-        ageRange: AgeRange,
+        ageRange: AgeRange
     ): Session {
         signIns += SignInCall(provider, token, nonce, displayName, ageRange)
         signInError?.let { throw it }
@@ -67,9 +67,7 @@ class FakeAuthApi(
     }
 }
 
-class InMemorySessionStore(
-    var session: Session? = null,
-) : SessionStore {
+class InMemorySessionStore(var session: Session? = null) : SessionStore {
     override fun load(): Session? = session
 
     override fun save(session: Session) {
@@ -81,9 +79,7 @@ class InMemorySessionStore(
     }
 }
 
-class FakeAgeSignals(
-    var range: AgeRange = AgeRange.unavailable("API_NOT_AVAILABLE"),
-) : AgeSignalsSource {
+class FakeAgeSignals(var range: AgeRange = AgeRange.unavailable("API_NOT_AVAILABLE")) : AgeSignalsSource {
     var calls = 0
 
     override suspend fun check(): AgeRange {
@@ -93,9 +89,7 @@ class FakeAgeSignals(
 }
 
 /** A sign-in sheet that returns a fixed token, or fails like a cancelled sheet. Records the provider nonce. */
-class FakeIdTokenProvider(
-    var token: IdToken? = IdToken(token = "provider-id-token"),
-) : IdTokenProvider {
+class FakeIdTokenProvider(var token: IdToken? = IdToken(token = "provider-id-token")) : IdTokenProvider {
     val providerNonces = mutableListOf<String>()
 
     override suspend fun signIn(providerNonce: String): IdToken {

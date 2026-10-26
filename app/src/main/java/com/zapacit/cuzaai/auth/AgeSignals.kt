@@ -12,21 +12,47 @@ interface AgeSignalsSource {
     suspend fun check(): AgeRange
 }
 
-/** Google Play Age Signals. Where the API isn't available (most of the EU today) the result is unknown + error code. */
+/** Google Play Age Signals. Where the API isn't offered (most of the EU today) the result is `unavailable`. */
 class PlayAgeSignalsSource(context: Context) : AgeSignalsSource {
     private val manager = AgeSignalsManagerFactory.create(context.applicationContext)
 
     override suspend fun check(): AgeRange = try {
         val result = manager.checkAgeSignals(AgeSignalsRequest.builder().build()).await()
-        AgeRange(source = AgeRange.SOURCE_GOOGLE_PLAY, lower = result.ageLower(), upper = result.ageUpper())
+        PlayAgeMapping.fromResult(result.ageLower(), result.ageUpper())
     } catch (
         @Suppress("SwallowedException") e: AgeSignalsException
     ) {
-        AgeRange.error(e.errorCode)
+        PlayAgeMapping.fromError(e.errorCode)
     } catch (
         @Suppress("TooGenericExceptionCaught", "SwallowedException") e: RuntimeException
     ) {
-        // Play services missing or broken: unknown; the API decides.
-        AgeRange.error(AgeSignalsErrorCode.INTERNAL_ERROR)
+        // Play services missing or broken: unavailable; the API decides.
+        PlayAgeMapping.fromError(AgeSignalsErrorCode.INTERNAL_ERROR)
     }
+}
+
+/** Play Age Signals → the API's AgeRange (openapi.yaml, schema AgeRange). Play has no "declined" outcome. */
+object PlayAgeMapping {
+    fun fromResult(lower: Int?, upper: Int?): AgeRange = if (lower == null && upper == null) {
+        AgeRange.unavailable("UNKNOWN")
+    } else {
+        AgeRange.shared(lower, upper, "SHARED")
+    }
+
+    fun fromError(code: Int): AgeRange = AgeRange.unavailable(
+        when (code) {
+            AgeSignalsErrorCode.API_NOT_AVAILABLE -> "API_NOT_AVAILABLE"
+            AgeSignalsErrorCode.PLAY_STORE_NOT_FOUND -> "PLAY_STORE_NOT_FOUND"
+            AgeSignalsErrorCode.NETWORK_ERROR -> "NETWORK_ERROR"
+            AgeSignalsErrorCode.PLAY_SERVICES_NOT_FOUND -> "PLAY_SERVICES_NOT_FOUND"
+            AgeSignalsErrorCode.CANNOT_BIND_TO_SERVICE -> "CANNOT_BIND_TO_SERVICE"
+            AgeSignalsErrorCode.PLAY_STORE_VERSION_OUTDATED -> "PLAY_STORE_VERSION_OUTDATED"
+            AgeSignalsErrorCode.PLAY_SERVICES_VERSION_OUTDATED -> "PLAY_SERVICES_VERSION_OUTDATED"
+            AgeSignalsErrorCode.CLIENT_TRANSIENT_ERROR -> "CLIENT_TRANSIENT_ERROR"
+            AgeSignalsErrorCode.APP_NOT_OWNED -> "APP_NOT_OWNED"
+            AgeSignalsErrorCode.SDK_VERSION_OUTDATED -> "SDK_VERSION_OUTDATED"
+            AgeSignalsErrorCode.INTERNAL_ERROR -> "INTERNAL_ERROR"
+            else -> "ERROR"
+        }
+    )
 }

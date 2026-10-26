@@ -18,4 +18,12 @@
     <string name="blocked_title">For parents only</string>
     <string name="blocked_body">ZapaKid accounts are for parents (18 or older). Ask your parent to set up ZapaKid and add you with a QR code.</string>
     <string name="blocked_back">Back</string>
+    <string name="error_rate_limited">Too many sign-in attempts. Try again later.</string>
+    <plurals name="error_rate_limited_minutes">
+        <item quantity="one">Too many sign-in attempts. Try again in %d minute.</item>
+        <item quantity="other">Too many sign-in attempts. Try again in %d minutes.</item>
+    </plurals>
+    <string name="age_declined_title">Age not shared</string>
+    <string name="age_declined_body">ZapaKid needs to confirm that parents are 18 or older. Share your age range when you\'re asked, then try again.</string>
+    <string name="age_declined_try_again">Try again</string>
 </resources>

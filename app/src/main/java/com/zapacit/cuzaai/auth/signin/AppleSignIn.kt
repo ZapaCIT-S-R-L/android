@@ -10,11 +10,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /**
  * Sign in with Apple, web flow (Apple has no native Android SDK).
- *  1. The app opens appleid.apple.com in a Custom Tab with a random state and nonce.
+ *  1. The app opens appleid.apple.com in a Custom Tab with a random state and the hashed API nonce.
  *  2. Apple posts the result (form_post) to the API's [AppleSignInConfig.redirectUri].
  *  3. The API redirects to the app's verified App Link, the result in the URL fragment (never sent to any server):
  *     https://zapakid.ro/app/apple#state=...&id_token=...[&name=...]  or  #state=...&error=...
- *  4. The app checks the state and posts the id_token to POST /v1/auth/apple; the API checks the nonce.
+ *  4. The app checks the state and posts the id_token and the raw nonce to POST /v1/auth/apple.
  */
 data class AppleSignInConfig(
     /** The Apple Services ID used as client_id (public, not a secret). */
@@ -22,7 +22,7 @@ data class AppleSignInConfig(
     val redirectUri: String
 )
 
-data class AppleAuthorizationRequest(val url: String, val state: String, val nonce: String)
+data class AppleAuthorizationRequest(val url: String, val state: String)
 
 sealed interface AppleReturn {
     data class Success(val token: IdToken) : AppleReturn
@@ -36,9 +36,8 @@ sealed interface AppleReturn {
 object AppleAuthorization {
     private const val AUTHORIZE = "https://appleid.apple.com/auth/authorize"
 
-    fun create(config: AppleSignInConfig): AppleAuthorizationRequest {
+    fun create(config: AppleSignInConfig, providerNonce: String): AppleAuthorizationRequest {
         val state = Random256.next()
-        val nonce = Random256.next()
         val url =
             AUTHORIZE
                 .toHttpUrl()
@@ -49,9 +48,9 @@ object AppleAuthorization {
                 .addQueryParameter("response_mode", "form_post")
                 .addQueryParameter("scope", "name email")
                 .addQueryParameter("state", state)
-                .addQueryParameter("nonce", nonce)
+                .addQueryParameter("nonce", providerNonce)
                 .build()
-        return AppleAuthorizationRequest(url.toString(), state, nonce)
+        return AppleAuthorizationRequest(url.toString(), state)
     }
 
     fun parseReturn(returnUrl: String, request: AppleAuthorizationRequest): AppleReturn {
@@ -63,7 +62,7 @@ object AppleAuthorization {
             params.queryParameter("state") != request.state -> AppleReturn.Rejected
             params.queryParameter("error") != null -> AppleReturn.Cancelled
             idToken == null -> AppleReturn.Rejected
-            else -> AppleReturn.Success(IdToken(idToken, request.nonce, name = params.queryParameter("name")))
+            else -> AppleReturn.Success(IdToken(idToken, displayName = params.queryParameter("name")))
         }
     }
 }
@@ -76,9 +75,9 @@ object AppleAuthorization {
 class AppleWebSignIn(private val activity: () -> Activity, private val config: AppleSignInConfig) : IdTokenProvider {
     private var pending: Pair<AppleAuthorizationRequest, CompletableDeferred<AppleReturn>>? = null
 
-    override suspend fun signIn(): IdToken {
+    override suspend fun signIn(providerNonce: String): IdToken {
         if (config.servicesId.isBlank()) throw SignInNotConfigured("Sign in with Apple")
-        val request = AppleAuthorization.create(config)
+        val request = AppleAuthorization.create(config, providerNonce)
         val result = CompletableDeferred<AppleReturn>()
         pending?.second?.complete(AppleReturn.Cancelled)
         pending = request to result

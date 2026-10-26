@@ -17,4 +17,13 @@
     <string name="blocked_title">Doar pentru părinți</string>
     <string name="blocked_body">Conturile ZapaKid sunt pentru părinți (18 ani sau mai mult). Roagă-ți părintele să instaleze ZapaKid și să te adauge cu un cod QR.</string>
     <string name="blocked_back">Înapoi</string>
+    <string name="error_rate_limited">Prea multe încercări de conectare. Încearcă din nou mai târziu.</string>
+    <plurals name="error_rate_limited_minutes">
+        <item quantity="one">Prea multe încercări de conectare. Încearcă din nou peste %d minut.</item>
+        <item quantity="few">Prea multe încercări de conectare. Încearcă din nou peste %d minute.</item>
+        <item quantity="other">Prea multe încercări de conectare. Încearcă din nou peste %d de minute.</item>
+    </plurals>
+    <string name="age_declined_title">Vârsta nu a fost împărtășită</string>
+    <string name="age_declined_body">ZapaKid trebuie să confirme că părinții au 18 ani sau mai mult. Împărtășește intervalul de vârstă când ți se cere, apoi încearcă din nou.</string>
+    <string name="age_declined_try_again">Încearcă din nou</string>
 </resources>

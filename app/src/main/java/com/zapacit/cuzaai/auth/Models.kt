@@ -9,50 +9,78 @@ enum class Provider(val path: String) {
     APPLE("apple")
 }
 
-/** The signed-in parent, as GET /v1/me returns it. */
+/** The signed-in parent (the fields the app uses from the API's Parent schema). */
 @Serializable
-data class Parent(val id: String, val name: String? = null, val email: String? = null)
+data class Parent(val id: String, val email: String? = null, val displayName: String? = null)
 
-/** A parent session: the bearer token for the API and the profile it belongs to. Stored only encrypted. */
+/** A parent session: the opaque bearer token, its expiry (ISO 8601) and the profile. Stored only encrypted. */
 @Serializable
-data class Session(val token: String, val parent: Parent)
+data class Session(val token: String, val expiresAt: String, val parent: Parent)
+
+@Serializable
+enum class AgeAvailability {
+    @SerialName("shared")
+    SHARED,
+
+    @SerialName("declined")
+    DECLINED,
+
+    @SerialName("unavailable")
+    UNAVAILABLE
+}
 
 /**
- * The age signal sent with every parent sign-in. On Android it comes from Google Play Age Signals.
- * Unknown values are null and left out of the request. The API decides; the phone only blocks clear minors early.
+ * The phone's age signal, sent with every parent sign-in (API schema AgeRange). On Android: Google Play Age Signals.
+ * [lowerBound] and [upperBound] are required by the API and sent as null when open or unknown.
  */
 @Serializable
 data class AgeRange(
+    val availability: AgeAvailability,
     val source: String,
-    val lower: Int? = null,
-    val upper: Int? = null,
-    /** Play Age Signals error code when the check failed (for example -1: not available in this country). */
-    val error: Int? = null
+    val lowerBound: Int?,
+    val upperBound: Int?,
+    /** The platform's raw status, letters and underscores only. Left out when null. */
+    val platformStatus: String? = null
 ) {
-    /** True only when the whole range is under 18. */
-    val isMinor: Boolean get() = upper != null && upper < ADULT_AGE
+    /** The API's rule: a shared range is adult only when lowerBound >= 18. The phone blocks these early. */
+    val isMinor: Boolean get() = availability == AgeAvailability.SHARED && (lowerBound ?: 0) < ADULT_AGE
 
     companion object {
-        const val SOURCE_GOOGLE_PLAY = "google_play"
+        const val SOURCE_GOOGLE_PLAY = "google_play_age_signals"
         const val ADULT_AGE = 18
 
-        fun unknown() = AgeRange(source = SOURCE_GOOGLE_PLAY)
+        fun shared(lower: Int?, upper: Int?, platformStatus: String?) =
+            AgeRange(AgeAvailability.SHARED, SOURCE_GOOGLE_PLAY, lower, upper, platformStatus)
 
-        fun error(code: Int) = AgeRange(source = SOURCE_GOOGLE_PLAY, error = code)
+        fun unavailable(platformStatus: String?) =
+            AgeRange(AgeAvailability.UNAVAILABLE, SOURCE_GOOGLE_PLAY, null, null, platformStatus)
+
+        fun declined() = AgeRange(AgeAvailability.DECLINED, SOURCE_GOOGLE_PLAY, null, null)
     }
 }
 
-/** Wire body of POST /v1/auth/google and /v1/auth/apple. */
 @Serializable
-internal data class SignInRequest(
-    @SerialName("id_token") val idToken: String,
-    val nonce: String? = null,
-    val name: String? = null,
-    @SerialName("age_range") val ageRange: AgeRange
+internal data class NonceResponse(val nonce: String)
+
+@Serializable
+internal data class GoogleSignInRequest(val idToken: String, val nonce: String, val ageRange: AgeRange)
+
+@Serializable
+internal data class AppleSignInRequest(
+    val identityToken: String,
+    val nonce: String,
+    val ageRange: AgeRange,
+    val displayName: String? = null
 )
 
 @Serializable
-internal data class MeResponse(val parent: Parent)
+internal data class SessionToken(val token: String, val expiresAt: String)
 
 @Serializable
-internal data class ErrorBody(val error: String, val message: String? = null)
+internal data class SignInResponse(val session: SessionToken, val parent: Parent, val newAccount: Boolean = false)
+
+@Serializable
+internal data class ErrorBody(val error: ErrorDetail)
+
+@Serializable
+internal data class ErrorDetail(val code: String, val message: String? = null)

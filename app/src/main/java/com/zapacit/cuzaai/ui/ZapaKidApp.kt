@@ -15,6 +15,7 @@ fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: IdToken
             SignInScreen(
                 busy = s.busy,
                 error = s.error,
+                retryAfterSeconds = s.retryAfterSeconds,
                 onGoogle = { viewModel.signIn(Provider.GOOGLE, google) },
                 onApple = { viewModel.signIn(Provider.APPLE, apple) }
             )
@@ -23,6 +24,8 @@ fun ZapaKidApp(viewModel: AuthViewModel, google: IdTokenProvider, apple: IdToken
 
         is AuthUiState.SignedIn -> HomeScreen(parent = s.parent, onSignOut = viewModel::logout)
 
-        AuthUiState.Blocked -> BlockedScreen(onBack = viewModel::dismissBlocked)
+        AuthUiState.Blocked -> BlockedScreen(onBack = viewModel::backToSignIn)
+
+        AuthUiState.AgeDeclined -> AgeDeclinedScreen(onTryAgain = viewModel::backToSignIn)
     }
 }

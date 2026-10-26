@@ -17,13 +17,12 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingExcept
  */
 class GoogleIdTokenProvider(private val activity: () -> Activity, private val serverClientId: String) :
     IdTokenProvider {
-    override suspend fun signIn(): IdToken {
+    override suspend fun signIn(providerNonce: String): IdToken {
         if (serverClientId.isBlank()) throw SignInNotConfigured("Google sign-in")
-        val nonce = Random256.next()
         val option =
             GetSignInWithGoogleOption
                 .Builder(serverClientId)
-                .setNonce(nonce)
+                .setNonce(providerNonce)
                 .build()
         val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
         val host = activity()
@@ -49,6 +48,6 @@ class GoogleIdTokenProvider(private val activity: () -> Activity, private val se
             } catch (e: GoogleIdTokenParsingException) {
                 throw SignInFailed("Unreadable Google credential").apply { initCause(e) }
             }
-        return IdToken(idToken = token.idToken, nonce = nonce)
+        return IdToken(token = token.idToken)
     }
 }

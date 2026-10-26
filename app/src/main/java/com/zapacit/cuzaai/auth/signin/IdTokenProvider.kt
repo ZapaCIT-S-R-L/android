@@ -2,18 +2,20 @@ package com.zapacit.cuzaai.auth.signin
 
 import java.security.SecureRandom
 
-/** An identity token from Google or Apple, with the nonce the app put into the request. */
+/** An identity token from Google or Apple. */
 data class IdToken(
-    val idToken: String,
-    val nonce: String?,
+    val token: String,
     /** Apple sends the name only on the very first sign-in, outside the token. */
-    val name: String? = null
+    val displayName: String? = null
 )
 
 /** Shows the provider's sign-in UI and returns its identity token. */
 interface IdTokenProvider {
-    /** @throws SignInCancelled when the parent closed the sheet; [SignInNotConfigured]; [SignInFailed]. */
-    suspend fun signIn(): IdToken
+    /**
+     * @param providerNonce the hex SHA-256 of the API's nonce; the token must carry it in its nonce claim.
+     * @throws SignInCancelled when the parent closed the sheet; [SignInNotConfigured]; [SignInFailed].
+     */
+    suspend fun signIn(providerNonce: String): IdToken
 }
 
 class SignInCancelled : Exception("Sign-in cancelled")
