@@ -53,7 +53,7 @@ Keystore's AES-GCM, nothing hand-made).
    (prepared once per app start with the Cloud project number), or a classic token with the challenge as nonce.
 3. `POST /v1/attestation/google {integrityToken, challenge}`, or the token in the `ZapaKid-Attestation` header on
    the protected request (sign-in, kid pairing, key upload).
-4. The API decodes it with Google and requires `PLAY_RECOGNIZED`, package `com.zapacit.cuzaai`, the release signing
+4. The API decodes it with Google and requires `PLAY_RECOGNIZED`, package `ro.zapakid.app`, the release signing
    certificate, `MEETS_DEVICE_INTEGRITY`, `LICENSED` and a fresh matching hash or nonce. Failure: `403
    attestation_failed`, and the app shows a clear "this app or phone can't be verified" screen.
 5. Fails closed on sign-in, account creation and kid pairing. Emulator and debug builds can't pass, so CI tests use

@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 // Built from parts so this file doesn't contain the id it forbids.
-const OLD_ID = ["com", "zapacit", "cuzaai"];
+const OLD_ID = ["com", "zapacit", "cuz" + "aai"];
 const OLD = new RegExp(`${OLD_ID.join("[./]")}|\\b${OLD_ID[2]}\\b`, "i");
 
 const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
