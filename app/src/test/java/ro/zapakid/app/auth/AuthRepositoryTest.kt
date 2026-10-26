@@ -213,6 +213,15 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun attestationFailedIsItsOwnResultForBothProviders() = runTest {
+        api.signInError = AuthApiException(403, "attestation_failed", "Not genuine.")
+
+        assertEquals(SignInResult.AttestationFailed, repository.signInWithGoogle(sheet))
+        assertEquals(SignInResult.AttestationFailed, repository.signInWithApple(browser))
+        assertNull(store.session)
+    }
+
+    @Test
     fun logoutClearsTheSessionAndTellsTheServer() = runTest {
         store.session = Session("zks_tok", FAR_FUTURE, ANA)
 
