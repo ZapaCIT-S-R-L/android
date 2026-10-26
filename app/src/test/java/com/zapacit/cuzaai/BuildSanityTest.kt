@@ -5,7 +5,7 @@ import org.junit.Test
 
 class BuildSanityTest {
     @Test
-    fun applicationIdIsTheExistingPlayListing() {
-        assertEquals("com.zapacit.cuzaai", BuildConfig.APPLICATION_ID)
+    fun applicationIdIsRoZapakidApp() {
+        assertEquals("ro.zapakid.app", BuildConfig.APPLICATION_ID)
     }
 }
