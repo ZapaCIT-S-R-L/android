@@ -4,7 +4,10 @@
 
     <!-- No cloud or device-to-device backup: chat keys and sessions must never come back through a backup.
          Chat-key recovery uses Android Block Store (end-to-end encrypted by Google) in a later change. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
+        android:name=".ZapaKidApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -17,10 +20,21 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.ZapaKid">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Sign in with Apple returns here. Verified App Link: needs /.well-known/assetlinks.json on zapakid.ro
+                 with this app's signing certificate, so no other app can receive the link. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="zapakid.ro" />
+                <data android:path="/app/apple" />
             </intent-filter>
         </activity>
     </application>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sign_in_intro">Familienchat, Ende-zu-Ende-verschlüsselt. Eltern melden sich hier an; Kinder kommen über das Handy eines Elternteils dazu.</string>
+    <string name="sign_in_google">Mit Google anmelden</string>
+    <string name="sign_in_apple">Mit Apple anmelden</string>
+    <string name="signing_in">Anmeldung läuft</string>
+    <string name="error_network">Keine Verbindung. Prüfe das Internet und versuche es noch einmal.</string>
+    <string name="error_server">Die Anmeldung hat nicht geklappt. Versuche es gleich noch einmal.</string>
+    <string name="error_not_configured">Diese Anmeldemethode ist in dieser Version noch nicht eingerichtet.</string>
+    <string name="error_provider">Die Anmeldung wurde nicht abgeschlossen. Versuche es noch einmal.</string>
+    <string name="agreement_title">Einverständnis der Eltern</string>
+    <string name="agreement_placeholder">Hier erscheint die Einverständniserklärung der Eltern.</string>
+    <string name="agreement_continue">Weiter</string>
+    <string name="signed_in_as">Angemeldet als %1$s</string>
+    <string name="signed_in">Angemeldet</string>
+    <string name="sign_out">Abmelden</string>
+    <string name="blocked_title">Nur für Eltern</string>
+    <string name="blocked_body">ZapaKid-Konten sind für Eltern (ab 18 Jahren). Bitte deine Eltern, ZapaKid einzurichten und dich mit einem QR-Code hinzuzufügen.</string>
+    <string name="blocked_back">Zurück</string>
+</resources>
