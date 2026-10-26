@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-fun quoted(property: String): String {
-    val value = providers.gradleProperty(property).getOrElse("")
+fun quoted(property: String, default: String = ""): String {
+    val value = providers.gradleProperty(property).getOrElse(default)
     require(value.all { it.isLetterOrDigit() || it in ".-_" }) { "$property has unexpected characters" }
     return "\"$value\""
 }
@@ -28,7 +28,11 @@ android {
         // Public identifiers, not secrets. Set them in ~/.gradle/gradle.properties or with -P; empty = not set up.
         buildConfigField("String", "API_BASE_URL", "\"https://api-staging.zapakid.ro/v1/\"")
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", quoted("zapakid.googleServerClientId"))
-        buildConfigField("String", "APPLE_SERVICES_ID", quoted("zapakid.appleServicesId"))
+        buildConfigField(
+            "String",
+            "APPLE_SERVICES_ID",
+            quoted("zapakid.appleServicesId", default = "ro.zapakid.signin")
+        )
         buildConfigField(
             "String",
             "APPLE_REDIRECT_URI",

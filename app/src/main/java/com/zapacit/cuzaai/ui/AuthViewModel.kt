@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zapacit.cuzaai.auth.AuthRepository
 import com.zapacit.cuzaai.auth.Parent
-import com.zapacit.cuzaai.auth.Provider
 import com.zapacit.cuzaai.auth.SignInError
 import com.zapacit.cuzaai.auth.SignInResult
+import com.zapacit.cuzaai.auth.signin.AppleBrowser
 import com.zapacit.cuzaai.auth.signin.IdTokenProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,12 +47,16 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         }
     }
 
-    fun signIn(provider: Provider, tokens: IdTokenProvider) {
+    fun signInWithGoogle(sheet: IdTokenProvider) = run { repository.signInWithGoogle(sheet) }
+
+    fun signInWithApple(browser: AppleBrowser) = run { repository.signInWithApple(browser) }
+
+    private fun run(signIn: suspend () -> SignInResult) {
         if ((_state.value as? AuthUiState.SignedOut)?.busy == true) return
         _state.value = AuthUiState.SignedOut(busy = true)
         viewModelScope.launch {
             _state.value =
-                when (val result = repository.signIn(provider, tokens)) {
+                when (val result = signIn()) {
                     is SignInResult.SignedIn -> AuthUiState.Agreement(result.parent)
 
                     SignInResult.Blocked -> AuthUiState.Blocked

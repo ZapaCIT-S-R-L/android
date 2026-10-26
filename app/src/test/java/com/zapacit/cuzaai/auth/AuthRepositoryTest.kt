@@ -3,8 +3,12 @@ package com.zapacit.cuzaai.auth
 import com.zapacit.cuzaai.auth.signin.SignInFailed
 import com.zapacit.cuzaai.auth.signin.SignInNotConfigured
 import com.zapacit.cuzaai.testing.ANA
+import com.zapacit.cuzaai.testing.APPLE_CODE
+import com.zapacit.cuzaai.testing.APPLE_CONFIG
+import com.zapacit.cuzaai.testing.APPLE_STATE
 import com.zapacit.cuzaai.testing.FAR_FUTURE
 import com.zapacit.cuzaai.testing.FakeAgeSignals
+import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FakeAuthApi
 import com.zapacit.cuzaai.testing.FakeIdTokenProvider
 import com.zapacit.cuzaai.testing.InMemorySessionStore
@@ -12,6 +16,7 @@ import com.zapacit.cuzaai.testing.NONCE
 import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -22,14 +27,15 @@ class AuthRepositoryTest {
     private val store = InMemorySessionStore()
     private val ages = FakeAgeSignals()
     private val sheet = FakeIdTokenProvider()
+    private val browser = FakeAppleBrowser()
     private var now = Instant.parse("2026-10-26T10:00:00Z")
-    private val repository = AuthRepository(api, store, ages, now = { now })
+    private val repository = AuthRepository(api, store, ages, APPLE_CONFIG, now = { now })
 
     @Test
     fun signInUsesAFreshNonceSendsTheAgeSignalAndStoresTheSession() = runTest {
         ages.range = AgeRange.shared(18, null, "SHARED")
 
-        val result = repository.signIn(Provider.GOOGLE, sheet)
+        val result = repository.signInWithGoogle(sheet)
 
         assertEquals(SignInResult.SignedIn(ANA), result)
         assertEquals(listOf(Nonces.providerNonce(NONCE)), sheet.providerNonces)
@@ -44,7 +50,7 @@ class AuthRepositoryTest {
     fun aMinorOnThePhoneIsBlockedBeforeAnySignInSheetOrServerCall() = runTest {
         ages.range = AgeRange.shared(13, 15, "SHARED")
 
-        val result = repository.signIn(Provider.GOOGLE, sheet)
+        val result = repository.signInWithGoogle(sheet)
 
         assertEquals(SignInResult.Blocked, result)
         assertTrue(sheet.providerNonces.isEmpty())
@@ -57,7 +63,7 @@ class AuthRepositoryTest {
     fun minorNotAllowedFromTheServerIsBlockedAndNoSessionIsKept() = runTest {
         api.signInError = AuthApiException(403, "minor_not_allowed", "Adults only.")
 
-        assertEquals(SignInResult.Blocked, repository.signIn(Provider.APPLE, sheet))
+        assertEquals(SignInResult.Blocked, repository.signInWithApple(browser))
         assertNull(store.session)
     }
 
@@ -65,7 +71,7 @@ class AuthRepositoryTest {
     fun ageDeclinedFromTheServerIsItsOwnResult() = runTest {
         api.signInError = AuthApiException(403, "age_declined", "Declined.")
 
-        assertEquals(SignInResult.AgeDeclined, repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.AgeDeclined, repository.signInWithGoogle(sheet))
         assertNull(store.session)
     }
 
@@ -73,7 +79,7 @@ class AuthRepositoryTest {
     fun rateLimitedKeepsTheRetryAfter() = runTest {
         api.nonceError = AuthApiException(429, "rate_limited", "Slow down.", retryAfterSeconds = 90)
 
-        assertEquals(SignInResult.Failed(SignInError.RATE_LIMITED, 90), repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.Failed(SignInError.RATE_LIMITED, 90), repository.signInWithGoogle(sheet))
         assertTrue("no sheet without a nonce", sheet.providerNonces.isEmpty())
     }
 
@@ -81,14 +87,14 @@ class AuthRepositoryTest {
     fun anInvalidNonceAsksToSignInAgain() = runTest {
         api.signInError = AuthApiException(401, "invalid_nonce", "Replay.")
 
-        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signInWithGoogle(sheet))
     }
 
     @Test
     fun cancellingTheSheetIsACancel() = runTest {
         sheet.token = null
 
-        assertEquals(SignInResult.Cancelled, repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.Cancelled, repository.signInWithGoogle(sheet))
         assertTrue(api.signIns.isEmpty())
     }
 
@@ -99,19 +105,111 @@ class AuthRepositoryTest {
 
         assertEquals(
             SignInResult.Failed(SignInError.NOT_CONFIGURED),
-            repository.signIn(Provider.GOOGLE, notConfigured)
+            repository.signInWithGoogle(notConfigured)
         )
-        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signIn(Provider.GOOGLE, failed))
+        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signInWithGoogle(failed))
     }
 
     @Test
     fun otherServerErrorsAreFailuresAndOfflineIsNetwork() = runTest {
         api.signInError = AuthApiException(503, "provider_unavailable", "Later.")
-        assertEquals(SignInResult.Failed(SignInError.SERVER), repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.Failed(SignInError.SERVER), repository.signInWithGoogle(sheet))
 
         api.nonceError = IOException("offline")
-        assertEquals(SignInResult.Failed(SignInError.NETWORK), repository.signIn(Provider.GOOGLE, sheet))
+        assertEquals(SignInResult.Failed(SignInError.NETWORK), repository.signInWithGoogle(sheet))
         assertNull(store.session)
+    }
+
+    @Test
+    fun appleWebFlowRunsNoncePkceStartBrowserAndExchangeInOrder() = runTest {
+        ages.range = AgeRange.shared(18, null, "SHARED")
+
+        val result = repository.signInWithApple(browser)
+
+        assertEquals(SignInResult.SignedIn(ANA), result)
+        val url = browser.opened.single().toHttpUrl()
+        assertEquals("ro.zapakid.signin", url.queryParameter("client_id"))
+        assertEquals(APPLE_STATE, url.queryParameter("state"))
+        assertEquals("Apple gets only the hash of the nonce", Nonces.providerNonce(NONCE), url.queryParameter("nonce"))
+        val exchange = api.appleExchanges.single()
+        assertEquals(APPLE_CODE, exchange.code)
+        assertEquals(NONCE, exchange.nonce)
+        assertEquals(ages.range, exchange.ageRange)
+        assertEquals(
+            "the verifier matches the challenge sent at start",
+            api.appleChallenges.single(),
+            Pkce.challenge(exchange.codeVerifier)
+        )
+        assertEquals("zks_session-token-1", store.session?.token)
+    }
+
+    @Test
+    fun appleMinorIsBlockedBeforeTheBrowserOpens() = runTest {
+        ages.range = AgeRange.shared(13, 15, "SHARED")
+
+        assertEquals(SignInResult.Blocked, repository.signInWithApple(browser))
+        assertTrue(browser.opened.isEmpty())
+        assertTrue(api.appleChallenges.isEmpty())
+    }
+
+    @Test
+    fun appleCancelledInTheBrowserOrAtAppleIsACancel() = runTest {
+        browser.cancel = true
+        assertEquals(SignInResult.Cancelled, repository.signInWithApple(browser))
+
+        browser.cancel = false
+        browser.reply = { state -> "error=user_cancelled_authorize&state=$state" }
+        assertEquals(SignInResult.Cancelled, repository.signInWithApple(browser))
+        assertTrue(api.appleExchanges.isEmpty())
+    }
+
+    @Test
+    fun appleReturnWithAnotherStateIsNeverExchanged() = runTest {
+        browser.reply = { _ -> "code=$APPLE_CODE&state=forged" }
+
+        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signInWithApple(browser))
+        assertTrue(api.appleExchanges.isEmpty())
+    }
+
+    @Test
+    fun appleErrorsFromTheCallbackAreReported() = runTest {
+        browser.reply = { state -> "error=provider_unavailable&state=$state" }
+        assertEquals(SignInResult.Failed(SignInError.SERVER), repository.signInWithApple(browser))
+
+        browser.reply = { state -> "error=invalid_state&state=$state" }
+        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signInWithApple(browser))
+    }
+
+    @Test
+    fun anInvalidAppleCodeAsksToSignInAgain() = runTest {
+        api.appleExchangeError = AuthApiException(401, "invalid_code", "Used.")
+
+        assertEquals(SignInResult.Failed(SignInError.PROVIDER), repository.signInWithApple(browser))
+        assertNull(store.session)
+    }
+
+    @Test
+    fun appleAgeRulesAreTheSameAsGoogle() = runTest {
+        api.appleExchangeError = AuthApiException(403, "age_declined", "Declined.")
+        assertEquals(SignInResult.AgeDeclined, repository.signInWithApple(browser))
+
+        api.appleExchangeError = AuthApiException(403, "minor_not_allowed", "Adults only.")
+        assertEquals(SignInResult.Blocked, repository.signInWithApple(browser))
+    }
+
+    @Test
+    fun appleWithoutAServicesIdIsNotConfigured() = runTest {
+        val unconfigured = AuthRepository(api, store, ages, APPLE_CONFIG.copy(servicesId = ""), now = { now })
+
+        assertEquals(SignInResult.Failed(SignInError.NOT_CONFIGURED), unconfigured.signInWithApple(browser))
+        assertTrue(browser.opened.isEmpty())
+    }
+
+    @Test
+    fun appleStartRateLimitedShowsTheWait() = runTest {
+        api.appleStartError = AuthApiException(429, "rate_limited", "Slow down.", retryAfterSeconds = 60)
+
+        assertEquals(SignInResult.Failed(SignInError.RATE_LIMITED, 60), repository.signInWithApple(browser))
     }
 
     @Test

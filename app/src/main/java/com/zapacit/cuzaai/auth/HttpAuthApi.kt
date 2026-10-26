@@ -21,31 +21,31 @@ class HttpAuthApi(private val baseUrl: HttpUrl, private val client: OkHttpClient
         return json.decodeFromString(NonceResponse.serializer(), execute(request)).nonce
     }
 
-    override suspend fun signIn(
-        provider: Provider,
-        token: String,
-        nonce: String,
-        displayName: String?,
-        ageRange: AgeRange
-    ): Session {
-        val body =
-            when (provider) {
-                Provider.GOOGLE ->
-                    json.encodeToString(GoogleSignInRequest.serializer(), GoogleSignInRequest(token, nonce, ageRange))
+    override suspend fun signInWithGoogle(idToken: String, nonce: String, ageRange: AgeRange): Session {
+        val body = json.encodeToString(GoogleSignInRequest.serializer(), GoogleSignInRequest(idToken, nonce, ageRange))
+        return session(post("auth/google", body))
+    }
 
-                Provider.APPLE ->
-                    json.encodeToString(
-                        AppleSignInRequest.serializer(),
-                        AppleSignInRequest(token, nonce, ageRange, displayName)
-                    )
-            }
-        val request =
-            Request
-                .Builder()
-                .url(endpoint("auth/${provider.path}"))
-                .post(body.toRequestBody(jsonType))
-                .build()
-        val response = json.decodeFromString(SignInResponse.serializer(), execute(request))
+    override suspend fun startAppleWeb(codeChallenge: String): String {
+        val body =
+            json.encodeToString(AppleWebStartRequest.serializer(), AppleWebStartRequest(codeChallenge, "S256"))
+        return json.decodeFromString(AppleWebStartResponse.serializer(), post("auth/apple/web", body)).state
+    }
+
+    override suspend fun exchangeApple(code: String, codeVerifier: String, nonce: String, ageRange: AgeRange): Session {
+        val body =
+            json.encodeToString(
+                AppleExchangeRequest.serializer(),
+                AppleExchangeRequest(code, codeVerifier, nonce, ageRange)
+            )
+        return session(post("auth/apple/exchange", body))
+    }
+
+    private suspend fun post(path: String, body: String): String =
+        execute(Request.Builder().url(endpoint(path)).post(body.toRequestBody(jsonType)).build())
+
+    private fun session(text: String): Session {
+        val response = json.decodeFromString(SignInResponse.serializer(), text)
         return Session(response.session.token, response.session.expiresAt, response.parent)
     }
 

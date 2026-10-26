@@ -1,6 +1,9 @@
 package com.zapacit.cuzaai.auth
 
-import com.zapacit.cuzaai.auth.signin.IdToken
+import com.zapacit.cuzaai.auth.signin.AppleAuthorization
+import com.zapacit.cuzaai.auth.signin.AppleBrowser
+import com.zapacit.cuzaai.auth.signin.AppleReturn
+import com.zapacit.cuzaai.auth.signin.AppleSignInConfig
 import com.zapacit.cuzaai.auth.signin.IdTokenProvider
 import com.zapacit.cuzaai.auth.signin.SignInCancelled
 import com.zapacit.cuzaai.auth.signin.SignInFailed
@@ -36,33 +39,48 @@ class AuthRepository(
     private val api: AuthApi,
     private val store: SessionStore,
     private val ageSignals: AgeSignalsSource,
+    private val appleConfig: AppleSignInConfig,
     private val now: () -> Instant = Instant::now
 ) {
     /** The parent of a stored, unexpired session, without a network call. */
     fun current(): Parent? = validSession()?.parent
 
-    @Suppress("SwallowedException", "ReturnCount") // errors become results; exceptions carry no data worth keeping
-    suspend fun signIn(
-        provider: Provider,
-        sheet: IdTokenProvider
-    ): SignInResult {
+    /** Google: Credential Manager sheet with SHA-256(nonce), then POST /v1/auth/google. */
+    suspend fun signInWithGoogle(sheet: IdTokenProvider): SignInResult = signIn { nonce, age ->
+        val token = sheet.signIn(Nonces.providerNonce(nonce))
+        api.signInWithGoogle(token.token, nonce, age)
+    }
+
+    /** Apple web flow: PKCE, POST /v1/auth/apple/web, browser to Apple and back by App Link, then exchange. */
+    suspend fun signInWithApple(browser: AppleBrowser): SignInResult {
+        if (appleConfig.servicesId.isBlank()) return SignInResult.Failed(SignInError.NOT_CONFIGURED)
+        return signIn { nonce, age ->
+            val verifier = Pkce.verifier()
+            val state = api.startAppleWeb(Pkce.challenge(verifier))
+            val returned = browser.authorize(AppleAuthorization.url(appleConfig, state, Nonces.providerNonce(nonce)))
+            when (val result = AppleAuthorization.parseReturn(returned, state)) {
+                is AppleReturn.Code -> api.exchangeApple(result.code, verifier, nonce, age)
+                else -> throw result.asFailure()
+            }
+        }
+    }
+
+    /** Shared by both providers: the age check, the one-time nonce, storing the session, and error mapping. */
+    @Suppress("SwallowedException") // errors become results; exceptions carry no data worth keeping
+    private suspend fun signIn(steps: suspend (nonce: String, age: AgeRange) -> Session): SignInResult {
         val age = ageSignals.check()
+        // A clear minor stops here: no nonce, no sign-in sheet, nothing sent.
         if (age.isMinor) return SignInResult.Blocked
         return try {
-            val nonce = api.nonce()
-            val token: IdToken =
-                try {
-                    sheet.signIn(Nonces.providerNonce(nonce))
-                } catch (e: SignInCancelled) {
-                    return SignInResult.Cancelled
-                } catch (e: SignInNotConfigured) {
-                    return SignInResult.Failed(SignInError.NOT_CONFIGURED)
-                } catch (e: SignInFailed) {
-                    return SignInResult.Failed(SignInError.PROVIDER)
-                }
-            val session = api.signIn(provider, token.token, nonce, token.displayName, age)
+            val session = steps(api.nonce(), age)
             store.save(session)
             SignInResult.SignedIn(session.parent)
+        } catch (e: SignInCancelled) {
+            SignInResult.Cancelled
+        } catch (e: SignInNotConfigured) {
+            SignInResult.Failed(SignInError.NOT_CONFIGURED)
+        } catch (e: SignInFailed) {
+            SignInResult.Failed(SignInError.PROVIDER)
         } catch (e: AuthApiException) {
             when {
                 e.isMinor -> SignInResult.Blocked
@@ -124,4 +142,21 @@ class AuthRepository(
         if (expired) store.clear()
         return session.takeUnless { expired }
     }
+}
+
+private const val PROVIDER_UNAVAILABLE = "provider_unavailable"
+private const val HTTP_UNAVAILABLE = 503
+
+/** A return link that isn't a code, as the exception the shared sign-in mapping understands. */
+private fun AppleReturn.asFailure(): Exception = when (this) {
+    AppleReturn.Cancelled -> SignInCancelled()
+
+    is AppleReturn.Error ->
+        if (code == PROVIDER_UNAVAILABLE) {
+            AuthApiException(HTTP_UNAVAILABLE, code, "Apple is unavailable")
+        } else {
+            SignInFailed("Apple web flow: $code")
+        }
+
+    else -> SignInFailed("Apple return link rejected")
 }
