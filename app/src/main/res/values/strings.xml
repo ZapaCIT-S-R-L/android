@@ -1,5 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ZapaKid</string>
-    <string name="welcome">Family chat, end-to-end encrypted.</string>
+    <string name="sign_in_intro">Family chat, end-to-end encrypted. Parents sign in here; kids join from a parent\'s phone.</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="sign_in_apple">Sign in with Apple</string>
+    <string name="signing_in">Signing in</string>
+    <string name="error_network">No connection. Check the internet and try again.</string>
+    <string name="error_server">Sign-in didn\'t work. Try again in a moment.</string>
+    <string name="error_not_configured">This sign-in method isn\'t set up in this build yet.</string>
+    <string name="error_provider">The sign-in didn\'t finish. Try again.</string>
+    <string name="agreement_title">Parental agreement</string>
+    <string name="agreement_placeholder">The parental agreement will appear here.</string>
+    <string name="agreement_continue">Continue</string>
+    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="signed_in">Signed in</string>
+    <string name="sign_out">Sign out</string>
+    <string name="blocked_title">For parents only</string>
+    <string name="blocked_body">ZapaKid accounts are for parents (18 or older). Ask your parent to set up ZapaKid and add you with a QR code.</string>
+    <string name="blocked_back">Back</string>
+    <string name="error_rate_limited">Too many sign-in attempts. Try again later.</string>
+    <plurals name="error_rate_limited_minutes">
+        <item quantity="one">Too many sign-in attempts. Try again in %d minute.</item>
+        <item quantity="other">Too many sign-in attempts. Try again in %d minutes.</item>
+    </plurals>
+    <string name="age_declined_title">Age not shared</string>
+    <string name="age_declined_body">ZapaKid needs to confirm that parents are 18 or older. Share your age range when you\'re asked, then try again.</string>
+    <string name="age_declined_try_again">Try again</string>
 </resources>

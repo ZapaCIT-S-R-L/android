@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sign_in_intro">Chat de familie, criptat end-to-end. Părinții se conectează aici; copiii intră de pe telefonul unui părinte.</string>
+    <string name="sign_in_google">Conectează-te cu Google</string>
+    <string name="sign_in_apple">Conectează-te cu Apple</string>
+    <string name="signing_in">Se conectează</string>
+    <string name="error_network">Nu există conexiune. Verifică internetul și încearcă din nou.</string>
+    <string name="error_server">Conectarea nu a reușit. Încearcă din nou peste puțin timp.</string>
+    <string name="error_not_configured">Această metodă de conectare nu este încă activă în această versiune.</string>
+    <string name="error_provider">Conectarea nu s-a încheiat. Încearcă din nou.</string>
+    <string name="agreement_title">Acordul părintelui</string>
+    <string name="agreement_placeholder">Acordul părintelui va apărea aici.</string>
+    <string name="agreement_continue">Continuă</string>
+    <string name="signed_in_as">Conectat ca %1$s</string>
+    <string name="signed_in">Conectat</string>
+    <string name="sign_out">Deconectează-te</string>
+    <string name="blocked_title">Doar pentru părinți</string>
+    <string name="blocked_body">Conturile ZapaKid sunt pentru părinți (18 ani sau mai mult). Roagă-ți părintele să instaleze ZapaKid și să te adauge cu un cod QR.</string>
+    <string name="blocked_back">Înapoi</string>
+    <string name="error_rate_limited">Prea multe încercări de conectare. Încearcă din nou mai târziu.</string>
+    <plurals name="error_rate_limited_minutes">
+        <item quantity="one">Prea multe încercări de conectare. Încearcă din nou peste %d minut.</item>
+        <item quantity="few">Prea multe încercări de conectare. Încearcă din nou peste %d minute.</item>
+        <item quantity="other">Prea multe încercări de conectare. Încearcă din nou peste %d de minute.</item>
+    </plurals>
+    <string name="age_declined_title">Vârsta nu a fost împărtășită</string>
+    <string name="age_declined_body">ZapaKid trebuie să confirme că părinții au 18 ani sau mai mult. Împărtășește intervalul de vârstă când ți se cere, apoi încearcă din nou.</string>
+    <string name="age_declined_try_again">Încearcă din nou</string>
+</resources>
