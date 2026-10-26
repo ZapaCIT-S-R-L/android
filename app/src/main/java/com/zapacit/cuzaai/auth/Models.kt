@@ -66,11 +66,17 @@ internal data class NonceResponse(val nonce: String)
 internal data class GoogleSignInRequest(val idToken: String, val nonce: String, val ageRange: AgeRange)
 
 @Serializable
-internal data class AppleSignInRequest(
-    val identityToken: String,
+internal data class AppleWebStartRequest(val codeChallenge: String, val codeChallengeMethod: String)
+
+@Serializable
+internal data class AppleWebStartResponse(val state: String)
+
+@Serializable
+internal data class AppleExchangeRequest(
+    val code: String,
+    val codeVerifier: String,
     val nonce: String,
-    val ageRange: AgeRange,
-    val displayName: String? = null
+    val ageRange: AgeRange
 )
 
 @Serializable

@@ -6,9 +6,9 @@ import com.zapacit.cuzaai.testing.ANA
 import com.zapacit.cuzaai.testing.APPLE_CODE
 import com.zapacit.cuzaai.testing.APPLE_CONFIG
 import com.zapacit.cuzaai.testing.APPLE_STATE
-import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FAR_FUTURE
 import com.zapacit.cuzaai.testing.FakeAgeSignals
+import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FakeAuthApi
 import com.zapacit.cuzaai.testing.FakeIdTokenProvider
 import com.zapacit.cuzaai.testing.InMemorySessionStore
@@ -135,7 +135,11 @@ class AuthRepositoryTest {
         assertEquals(APPLE_CODE, exchange.code)
         assertEquals(NONCE, exchange.nonce)
         assertEquals(ages.range, exchange.ageRange)
-        assertEquals("the verifier matches the challenge sent at start", api.appleChallenges.single(), Pkce.challenge(exchange.codeVerifier))
+        assertEquals(
+            "the verifier matches the challenge sent at start",
+            api.appleChallenges.single(),
+            Pkce.challenge(exchange.codeVerifier)
+        )
         assertEquals("zks_session-token-1", store.session?.token)
     }
 

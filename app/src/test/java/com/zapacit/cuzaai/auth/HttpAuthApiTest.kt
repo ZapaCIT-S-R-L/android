@@ -100,7 +100,9 @@ class HttpAuthApiTest {
 
     @Test
     fun appleWebStartSendsThePkceChallengeAndReturnsTheState() = runTest {
-        server.enqueue(MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}"""))
+        server.enqueue(
+            MockResponse(code = 200, body = """{"state":"$APPLE_STATE","expiresAt":"2026-10-26T10:10:00Z"}""")
+        )
 
         assertEquals(APPLE_STATE, api.startAppleWeb(codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"))
 

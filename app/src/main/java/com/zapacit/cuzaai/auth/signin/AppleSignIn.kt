@@ -7,101 +7,124 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.CompletableDeferred
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * Sign in with Apple, web flow (Apple has no native Android SDK).
- *  1. The app opens appleid.apple.com in a Custom Tab with a random state and the hashed API nonce.
- *  2. Apple posts the result (form_post) to the API's [AppleSignInConfig.redirectUri].
- *  3. The API redirects to the app's verified App Link, the result in the URL fragment (never sent to any server):
- *     https://zapakid.ro/app/apple#state=...&id_token=...[&name=...]  or  #state=...&error=...
- *  4. The app checks the state and posts the id_token and the raw nonce to POST /v1/auth/apple.
+ * Sign in with Apple on Android: Apple's web flow, per the API contract (POST /v1/auth/apple/web).
+ *  1. The app gets a nonce, makes a PKCE verifier, and the API returns the flow's `state`.
+ *  2. A Custom Tab opens Apple with the Services ID, the API's callback, `state` and SHA-256(nonce).
+ *  3. Apple posts to the API's callback, which verifies Apple's token and 303s to the verified App Link
+ *     https://zapakid.ro/app/apple#code=...&state=...  (the API's own one-time code, never an Apple token).
+ *  4. The app checks `state` and trades the code + verifier at POST /v1/auth/apple/exchange.
  */
 data class AppleSignInConfig(
     /** The Apple Services ID used as client_id (public, not a secret). */
     val servicesId: String,
     val redirectUri: String
-)
-
-data class AppleAuthorizationRequest(val url: String, val state: String)
+) {
+    companion object {
+        val STAGING =
+            AppleSignInConfig(
+                servicesId = "ro.zapakid.signin",
+                redirectUri = "https://api-staging.zapakid.ro/v1/auth/apple/callback"
+            )
+    }
+}
 
 sealed interface AppleReturn {
-    data class Success(val token: IdToken) : AppleReturn
+    data class Code(val code: String) : AppleReturn
 
     data object Cancelled : AppleReturn
 
-    /** Wrong state, or no token: possibly forged, never used. */
+    /** An error from the API's callback (invalid_state, invalid_token, provider_unavailable) or from Apple. */
+    data class Error(val code: String) : AppleReturn
+
+    /** Wrong link, wrong state, or no code: possibly forged, never used. */
     data object Rejected : AppleReturn
 }
 
 object AppleAuthorization {
     private const val AUTHORIZE = "https://appleid.apple.com/auth/authorize"
+    private const val RETURN_HOST = "zapakid.ro"
+    private const val RETURN_PATH = "/app/apple"
+    private val CANCELLED = setOf("user_cancelled_authorize")
 
-    fun create(config: AppleSignInConfig, providerNonce: String): AppleAuthorizationRequest {
-        val state = Random256.next()
-        val url =
-            AUTHORIZE
-                .toHttpUrl()
-                .newBuilder()
-                .addQueryParameter("client_id", config.servicesId)
-                .addQueryParameter("redirect_uri", config.redirectUri)
-                .addQueryParameter("response_type", "code id_token")
-                .addQueryParameter("response_mode", "form_post")
-                .addQueryParameter("scope", "name email")
-                .addQueryParameter("state", state)
-                .addQueryParameter("nonce", providerNonce)
-                .build()
-        return AppleAuthorizationRequest(url.toString(), state)
-    }
+    fun url(config: AppleSignInConfig, state: String, providerNonce: String): String = AUTHORIZE
+        .toHttpUrl()
+        .newBuilder()
+        .addQueryParameter("client_id", config.servicesId)
+        .addQueryParameter("redirect_uri", config.redirectUri)
+        .addQueryParameter("response_type", "code id_token")
+        .addQueryParameter("response_mode", "form_post")
+        .addQueryParameter("scope", "name email")
+        .addQueryParameter("state", state)
+        .addQueryParameter("nonce", providerNonce)
+        .build()
+        .toString()
 
-    fun parseReturn(returnUrl: String, request: AppleAuthorizationRequest): AppleReturn {
+    fun parseReturn(returnUrl: String, expectedState: String): AppleReturn {
+        val link = returnUrl.toHttpUrlOrNull()
         val fragment = returnUrl.substringAfter('#', missingDelimiterValue = "")
         // Parse the fragment as a query string with OkHttp's decoder.
         val params: HttpUrl = "https://return.invalid/?$fragment".toHttpUrl()
-        val idToken = params.queryParameter("id_token")?.takeIf { it.isNotBlank() }
+        val error = params.queryParameter("error")
+        val code = params.queryParameter("code")?.takeIf { it.isNotBlank() }
         return when {
-            params.queryParameter("state") != request.state -> AppleReturn.Rejected
-            params.queryParameter("error") != null -> AppleReturn.Cancelled
-            idToken == null -> AppleReturn.Rejected
-            else -> AppleReturn.Success(IdToken(idToken, displayName = params.queryParameter("name")))
+            link == null || !link.isHttps || link.host != RETURN_HOST || link.encodedPath != RETURN_PATH ->
+                AppleReturn.Rejected
+
+            params.queryParameter("state") != expectedState -> AppleReturn.Rejected
+
+            error in CANCELLED -> AppleReturn.Cancelled
+
+            error != null -> AppleReturn.Error(error)
+
+            code == null -> AppleReturn.Rejected
+
+            else -> AppleReturn.Code(code)
         }
     }
 }
 
-/**
- * [IdTokenProvider] for Apple: opens the Custom Tab and waits for the App Link back.
- * MainActivity forwards the returning link to [onReturn], and calls [onResumed] whenever it resumes, so closing the
- * tab without finishing counts as a cancel.
- */
-class AppleWebSignIn(private val activity: () -> Activity, private val config: AppleSignInConfig) : IdTokenProvider {
-    private var pending: Pair<AppleAuthorizationRequest, CompletableDeferred<AppleReturn>>? = null
+/** Opens Apple's authorize URL and returns the App Link the API redirected back to. */
+interface AppleBrowser {
+    /** @throws SignInCancelled when the parent closes the tab without finishing. */
+    suspend fun authorize(url: String): String
+}
 
-    override suspend fun signIn(providerNonce: String): IdToken {
-        if (config.servicesId.isBlank()) throw SignInNotConfigured("Sign in with Apple")
-        val request = AppleAuthorization.create(config, providerNonce)
-        val result = CompletableDeferred<AppleReturn>()
-        pending?.second?.complete(AppleReturn.Cancelled)
-        pending = request to result
-        CustomTabsIntent.Builder().build().launchUrl(activity(), request.url.toUri())
-        return when (val r = result.await()) {
-            is AppleReturn.Success -> r.token
-            AppleReturn.Cancelled -> throw SignInCancelled()
-            AppleReturn.Rejected -> throw SignInFailed("Apple sign-in result rejected")
-        }
+/**
+ * [AppleBrowser] with a Custom Tab. MainActivity (singleTask) forwards the returning App Link to [onReturn] in
+ * onNewIntent, and calls [onResumed] whenever it resumes: a resume without a link means the tab was closed.
+ */
+class CustomTabAppleBrowser(
+    private val activity: () -> Activity,
+    private val openCustomTab: (
+        Activity,
+        Uri
+    ) -> Unit = { host, uri -> CustomTabsIntent.Builder().build().launchUrl(host, uri) }
+) : AppleBrowser {
+    private var pending: CompletableDeferred<String>? = null
+
+    override suspend fun authorize(url: String): String {
+        pending?.cancel()
+        val result = CompletableDeferred<String>()
+        pending = result
+        openCustomTab(activity(), url.toUri())
+        return result.await()
     }
 
-    /** @return true when the link was an Apple sign-in return and was handled. */
+    /** @return true when a sign-in was waiting for this link. */
     fun onReturn(uri: Uri): Boolean {
-        val (request, result) = pending ?: return false
+        val result = pending ?: return false
         pending = null
-        result.complete(AppleAuthorization.parseReturn(uri.toString(), request))
+        result.complete(uri.toString())
         return true
     }
 
-    /** MainActivity is singleTask: a return link arrives in onNewIntent before onResume, so this only cancels. */
     fun onResumed() {
-        pending?.let { (_, result) ->
+        pending?.let {
             pending = null
-            result.complete(AppleReturn.Cancelled)
+            it.completeExceptionally(SignInCancelled())
         }
     }
 }

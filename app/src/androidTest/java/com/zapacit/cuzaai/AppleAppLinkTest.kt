@@ -45,10 +45,9 @@ class AppleAppLinkTest {
         app.graph = original
     }
 
-    private fun appLink(fragment: String) =
-        Intent(Intent.ACTION_VIEW, "https://zapakid.ro/app/apple#$fragment".toUri())
-            .addCategory(Intent.CATEGORY_BROWSABLE)
-            .setPackage(app.packageName)
+    private fun appLink(fragment: String) = Intent(Intent.ACTION_VIEW, "https://zapakid.ro/app/apple#$fragment".toUri())
+        .addCategory(Intent.CATEGORY_BROWSABLE)
+        .setPackage(app.packageName)
 
     @Test
     fun theAppLinkFromTheApiCallbackFinishesTheAppleSignIn() {
@@ -64,7 +63,7 @@ class AppleAppLinkTest {
                     opened += uri
                     // What happens after Apple: the API's callback redirects the browser to the App Link.
                     activity.startActivity(appLink("code=$APPLE_CODE&state=${uri.getQueryParameter("state")}"))
-                },
+                }
             )
 
         ActivityScenario.launch(MainActivity::class.java).use {
@@ -91,7 +90,11 @@ class AppleAppLinkTest {
 
     @Test
     fun otherZapaKidLinksDoNotOpenTheApp() {
-        for (url in listOf("https://zapakid.ro/app/other", "https://www.zapakid.ro/app/apple", "http://zapakid.ro/app/apple")) {
+        for (url in listOf(
+            "https://zapakid.ro/app/other",
+            "https://www.zapakid.ro/app/apple",
+            "http://zapakid.ro/app/apple"
+        )) {
             val intent =
                 Intent(Intent.ACTION_VIEW, url.toUri())
                     .addCategory(Intent.CATEGORY_BROWSABLE)

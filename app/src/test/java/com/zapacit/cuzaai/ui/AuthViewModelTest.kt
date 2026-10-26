@@ -8,9 +8,9 @@ import com.zapacit.cuzaai.auth.Session
 import com.zapacit.cuzaai.auth.SignInError
 import com.zapacit.cuzaai.testing.ANA
 import com.zapacit.cuzaai.testing.APPLE_CONFIG
-import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FAR_FUTURE
 import com.zapacit.cuzaai.testing.FakeAgeSignals
+import com.zapacit.cuzaai.testing.FakeAppleBrowser
 import com.zapacit.cuzaai.testing.FakeAuthApi
 import com.zapacit.cuzaai.testing.FakeIdTokenProvider
 import com.zapacit.cuzaai.testing.InMemorySessionStore

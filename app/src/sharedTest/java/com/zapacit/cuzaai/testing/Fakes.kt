@@ -29,7 +29,7 @@ const val APPLE_CODE = "c0de0-c0de0-c0de0-c0de0-c0de0-c0de0-c0de0-x"
 val APPLE_CONFIG =
     AppleSignInConfig(
         servicesId = "ro.zapakid.signin",
-        redirectUri = "https://api-staging.zapakid.ro/v1/auth/apple/callback",
+        redirectUri = "https://api-staging.zapakid.ro/v1/auth/apple/callback"
     )
 
 /** Stub backend: answers like the API contract, records what the app sent. */
@@ -39,16 +39,16 @@ class FakeAuthApi(
     var meError: Exception? = null,
     var logoutError: Exception? = null
 ) : AuthApi {
-    data class SignInCall(
-        val provider: Provider,
-        val token: String,
-        val nonce: String,
-        val displayName: String?,
-        val ageRange: AgeRange
-    )
+    data class SignInCall(val provider: Provider, val token: String, val nonce: String, val ageRange: AgeRange)
+
+    data class AppleExchange(val code: String, val codeVerifier: String, val nonce: String, val ageRange: AgeRange)
 
     var noncesIssued = 0
+    var appleStartError: Exception? = null
+    var appleExchangeError: AuthApiException? = null
     val signIns = mutableListOf<SignInCall>()
+    val appleChallenges = mutableListOf<String>()
+    val appleExchanges = mutableListOf<AppleExchange>()
     val logouts = mutableListOf<String>()
 
     override suspend fun nonce(): String {
@@ -57,16 +57,23 @@ class FakeAuthApi(
         return NONCE
     }
 
-    override suspend fun signIn(
-        provider: Provider,
-        token: String,
-        nonce: String,
-        displayName: String?,
-        ageRange: AgeRange
-    ): Session {
-        signIns += SignInCall(provider, token, nonce, displayName, ageRange)
+    override suspend fun signInWithGoogle(idToken: String, nonce: String, ageRange: AgeRange): Session {
+        signIns += SignInCall(Provider.GOOGLE, idToken, nonce, ageRange)
         signInError?.let { throw it }
-        return Session(token = "zks_session-token-1", expiresAt = FAR_FUTURE, parent = ANA)
+        return SESSION
+    }
+
+    override suspend fun startAppleWeb(codeChallenge: String): String {
+        appleStartError?.let { throw it }
+        appleChallenges += codeChallenge
+        return APPLE_STATE
+    }
+
+    override suspend fun exchangeApple(code: String, codeVerifier: String, nonce: String, ageRange: AgeRange): Session {
+        appleExchanges += AppleExchange(code, codeVerifier, nonce, ageRange)
+        signIns += SignInCall(Provider.APPLE, code, nonce, ageRange)
+        (appleExchangeError ?: signInError)?.let { throw it }
+        return SESSION
     }
 
     override suspend fun me(token: String): Parent {
@@ -77,6 +84,10 @@ class FakeAuthApi(
     override suspend fun logout(token: String) {
         logouts += token
         logoutError?.let { throw it }
+    }
+
+    private companion object {
+        val SESSION = Session(token = "zks_session-token-1", expiresAt = FAR_FUTURE, parent = ANA)
     }
 }
 
@@ -117,7 +128,7 @@ class FakeIdTokenProvider(var token: IdToken? = IdToken(token = "provider-id-tok
  */
 class FakeAppleBrowser(
     var reply: (state: String) -> String = { state -> "code=$APPLE_CODE&state=$state" },
-    var cancel: Boolean = false,
+    var cancel: Boolean = false
 ) : AppleBrowser {
     val opened = mutableListOf<String>()
 

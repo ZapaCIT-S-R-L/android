@@ -3,5 +3,11 @@ package com.zapacit.cuzaai
 import android.app.Application
 
 class ZapaKidApplication : Application() {
-    val graph: AppGraph by lazy { AppGraph(this) }
+    /** Replaced only by emulator tests, before an activity starts. */
+    lateinit var graph: AppGraph
+
+    override fun onCreate() {
+        super.onCreate()
+        graph = AppGraph(this)
+    }
 }

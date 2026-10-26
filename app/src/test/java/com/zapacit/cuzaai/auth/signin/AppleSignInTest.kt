@@ -38,20 +38,30 @@ class AppleSignInTest {
 
     @Test
     fun theReturnWithTheRightStateGivesTheOneTimeCode() {
-        val result = AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#code=$APPLE_CODE&state=$APPLE_STATE", APPLE_STATE)
+        val result = AppleAuthorization.parseReturn(
+            "https://zapakid.ro/app/apple#code=$APPLE_CODE&state=$APPLE_STATE",
+            APPLE_STATE
+        )
         assertEquals(AppleReturn.Code(APPLE_CODE), result)
     }
 
     @Test
     fun aReturnWithAnotherStateIsRejected() {
-        val result = AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#code=$APPLE_CODE&state=forged", APPLE_STATE)
+        val result = AppleAuthorization.parseReturn(
+            "https://zapakid.ro/app/apple#code=$APPLE_CODE&state=forged",
+            APPLE_STATE
+        )
         assertEquals(AppleReturn.Rejected, result)
     }
 
     @Test
     fun aReturnOnAnotherHostOrPathIsRejected() {
         val fragment = "#code=$APPLE_CODE&state=$APPLE_STATE"
-        for (url in listOf("https://evil.example/app/apple", "https://zapakid.ro/app/other", "http://zapakid.ro/app/apple")) {
+        for (url in listOf(
+            "https://evil.example/app/apple",
+            "https://zapakid.ro/app/other",
+            "http://zapakid.ro/app/apple"
+        )) {
             assertEquals(url, AppleReturn.Rejected, AppleAuthorization.parseReturn(url + fragment, APPLE_STATE))
         }
     }
@@ -59,19 +69,28 @@ class AppleSignInTest {
     @Test
     fun theUserCancellingAtAppleIsACancel() {
         val result =
-            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#error=user_cancelled_authorize&state=$APPLE_STATE", APPLE_STATE)
+            AppleAuthorization.parseReturn(
+                "https://zapakid.ro/app/apple#error=user_cancelled_authorize&state=$APPLE_STATE",
+                APPLE_STATE
+            )
         assertEquals(AppleReturn.Cancelled, result)
     }
 
     @Test
     fun anApiErrorIsPassedOn() {
         val result =
-            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#error=provider_unavailable&state=$APPLE_STATE", APPLE_STATE)
+            AppleAuthorization.parseReturn(
+                "https://zapakid.ro/app/apple#error=provider_unavailable&state=$APPLE_STATE",
+                APPLE_STATE
+            )
         assertEquals(AppleReturn.Error("provider_unavailable"), result)
     }
 
     @Test
     fun aReturnWithoutACodeIsRejected() {
-        assertEquals(AppleReturn.Rejected, AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#state=$APPLE_STATE", APPLE_STATE))
+        assertEquals(
+            AppleReturn.Rejected,
+            AppleAuthorization.parseReturn("https://zapakid.ro/app/apple#state=$APPLE_STATE", APPLE_STATE)
+        )
     }
 }

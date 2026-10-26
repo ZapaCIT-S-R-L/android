@@ -8,8 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.zapacit.cuzaai.auth.signin.AppleSignInConfig
-import com.zapacit.cuzaai.auth.signin.AppleWebSignIn
+import com.zapacit.cuzaai.auth.signin.CustomTabAppleBrowser
 import com.zapacit.cuzaai.auth.signin.GoogleIdTokenProvider
 import com.zapacit.cuzaai.ui.AuthViewModel
 import com.zapacit.cuzaai.ui.ZapaKidApp
@@ -23,12 +22,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val google by lazy { GoogleIdTokenProvider({ this }, BuildConfig.GOOGLE_SERVER_CLIENT_ID) }
-    private val apple by lazy {
-        AppleWebSignIn(
-            activity = { this },
-            config = AppleSignInConfig(BuildConfig.APPLE_SERVICES_ID, BuildConfig.APPLE_REDIRECT_URI)
-        )
-    }
+    private val apple by lazy { CustomTabAppleBrowser(activity = { this }, openCustomTab = graph.openCustomTab) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
