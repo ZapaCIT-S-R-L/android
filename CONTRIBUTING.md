@@ -15,13 +15,24 @@ Thanks for helping. Issues and pull requests are welcome.
 ## Dependencies
 
 Versions are pinned exactly in `gradle/libs.versions.toml`. Gradle verifies every downloaded file against
-`gradle/verification-metadata.xml`. After adding or bumping a dependency (including Dependabot PRs), refresh it:
+`gradle/verification-metadata.xml` (SHA-256), so a new or bumped dependency fails CI until that file is refreshed.
 
-```sh
-./scripts/update-verification-metadata.sh
-```
+**Your own change:** refresh it with the workflow below (preferred: it runs on Linux with an emulator, so it also
+covers aapt2 for every platform and the emulator test runner), or locally with
+`./scripts/update-verification-metadata.sh` (add `WITH_DEVICE=1` with an emulator running).
 
-Review the diff: only the artifacts you changed should appear.
+**Dependabot Gradle PRs:** refreshed by hand, by a maintainer. There is no bot with a write token that commits to
+pull requests.
+
+1. Actions → **verification-metadata** → Run workflow → choose the Dependabot branch.
+2. Download the `verification-metadata` artifact when the run finishes.
+3. Review the diff against the branch: only the bumped artifacts (and their new transitive dependencies) may
+   change. Anything else is a reason to stop and look.
+4. Commit it to the Dependabot branch (`git commit -m "Verification metadata for <bump>"`) and push. CI then runs
+   again with strict verification.
+
+Never commit a refreshed file you haven't reviewed, and never turn verification off (`--dependency-verification
+lenient` / `off`) in CI.
 
 ## Contributor License Agreement
 
