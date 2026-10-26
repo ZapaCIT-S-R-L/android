@@ -30,9 +30,18 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Public identifiers, not secrets. Set them in ~/.gradle/gradle.properties or with -P; empty = not set up.
+        // Public identifiers, not secrets. Override with -P or ~/.gradle/gradle.properties; empty = not set up.
         buildConfigField("String", "API_BASE_URL", "\"https://api-staging.zapakid.ro/v1/\"")
-        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", quoted("zapakid.googleServerClientId"))
+        // The OAuth web (server) client the API checks the token audience against. The Android OAuth client
+        // (package ro.zapakid.app + signing SHA-1) is registered in Google Cloud; it isn't referenced in code.
+        buildConfigField(
+            "String",
+            "GOOGLE_SERVER_CLIENT_ID",
+            quoted(
+                "zapakid.googleServerClientId",
+                default = "64042746735-r70nv5pmlro7hpksk1te3ur008ungss1.apps.googleusercontent.com"
+            )
+        )
         buildConfigField(
             "String",
             "APPLE_SERVICES_ID",
