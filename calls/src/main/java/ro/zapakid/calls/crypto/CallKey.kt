@@ -9,7 +9,7 @@ import java.security.SecureRandom
 class CallKey private constructor(val epoch: Int, private val material: ByteArray) {
     init {
         require(material.size == SIZE) { "a call key has $SIZE bytes" }
-        require(epoch > 0) { "epochs start at 1" }
+        require(epoch >= 0) { "epochs are not negative" }
     }
 
     fun bytes(): ByteArray = material.copyOf()

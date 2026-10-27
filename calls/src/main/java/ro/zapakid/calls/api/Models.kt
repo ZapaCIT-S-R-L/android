@@ -2,8 +2,8 @@ package ro.zapakid.calls.api
 
 import kotlinx.serialization.Serializable
 
-// Wire models of calls.zapakid.ro, from the build brief. Kept field-for-field with services/calls/openapi.yaml
-// once it lands; unknown fields are ignored so the server can add some without breaking older apps.
+// Wire models of calls.zapakid.ro, field for field with zapakid-api services/calls/openapi.yaml. Unknown fields are
+// ignored so the server can add some without breaking older apps.
 
 @Serializable
 data class IceServer(val urls: List<String>, val username: String? = null, val credential: String? = null) {
@@ -11,7 +11,36 @@ data class IceServer(val urls: List<String>, val username: String? = null, val c
 }
 
 @Serializable
-data class CallTicket(val callId: String, val iceServers: List<IceServer> = emptyList())
+data class WireDevice(val accountId: String, val deviceId: Int)
+
+@Serializable
+data class WireParticipant(
+    val accountId: String,
+    val deviceId: Int,
+    val role: String = "parent",
+    val sessionId: String? = null,
+    val tracks: List<String> = emptyList(),
+    val connected: Boolean = false
+)
+
+/** The `Call` schema: state, the current key epoch and leader, participants in join order. */
+@Serializable
+data class WireCall(
+    val callId: String,
+    val conversationId: String = "",
+    val state: String = "ringing",
+    val epoch: Int = 0,
+    val keyLeader: WireDevice? = null,
+    val participants: List<WireParticipant> = emptyList(),
+    val declined: List<String> = emptyList(),
+    val endReason: String? = null
+)
+
+@Serializable
+internal data class CallGrant(val call: WireCall, val iceServers: List<IceServer> = emptyList())
+
+/** What starting or joining a call returns. */
+data class CallTicket(val callId: String, val iceServers: List<IceServer> = emptyList(), val epoch: Int = 0)
 
 @Serializable
 internal data class CreateCallRequest(val conversationId: String)
