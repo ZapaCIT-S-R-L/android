@@ -20,10 +20,14 @@ class AttachmentCipherTest {
         val sealed = AttachmentCipher.encrypt(photo)
         val tampered = sealed.bytes.copyOf().also { it[20] = (it[20] + 1).toByte() }
 
-        assertThrows(MessageSealerException::class.java) { AttachmentCipher.decrypt(tampered, sealed.key, sealed.sha256) }
+        assertThrows(MessageSealerException::class.java) {
+            AttachmentCipher.decrypt(tampered, sealed.key, sealed.sha256)
+        }
         assertThrows(MessageSealerException::class.java) {
             AttachmentCipher.decrypt(tampered, sealed.key, AttachmentCipher.sha256(tampered))
         }
-        assertThrows(MessageSealerException::class.java) { AttachmentCipher.decrypt(sealed.bytes, ByteArray(32), sealed.sha256) }
+        assertThrows(MessageSealerException::class.java) {
+            AttachmentCipher.decrypt(sealed.bytes, ByteArray(32), sealed.sha256)
+        }
     }
 }

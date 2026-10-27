@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_title">Chats</string>
+    <string name="chat_empty">Noch keine Chats. Sag Hallo zu deiner Familie!</string>
+    <plurals name="chat_unread">
+        <item quantity="one">%1$d neue Nachricht</item>
+        <item quantity="other">%1$d neue Nachrichten</item>
+    </plurals>
+    <string name="chat_back">Zurück</string>
+    <string name="chat_call">%1$s anrufen</string>
+    <string name="chat_photo">Foto senden</string>
+    <string name="chat_photo_received">Foto</string>
+    <string name="chat_photo_open">Foto zeigen</string>
+    <string name="chat_type">Nachricht schreiben</string>
+    <string name="chat_send">Senden</string>
+    <string name="chat_voice">Sprachnachricht aufnehmen</string>
+    <string name="chat_voice_stop">Stoppen und senden</string>
+    <string name="chat_voice_note">Sprachnachricht, %1$d s. Abspielen</string>
+    <string name="chat_sending">Wird gesendet…</string>
+    <string name="chat_failed">Nicht gesendet. Tippe, um es nochmal zu versuchen</string>
+</resources>

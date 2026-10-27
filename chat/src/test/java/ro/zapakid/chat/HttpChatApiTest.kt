@@ -54,7 +54,10 @@ class HttpChatApiTest {
         assertEquals("Bearer chat-0", request.headers["Authorization"])
         val body = Json.parseToJsonElement(request.body!!.utf8()).jsonObject
         assertEquals("m1", body["id"]!!.jsonPrimitive.content)
-        assertEquals("ion-1", body["sealed"]!!.jsonArray[0].jsonObject["toDevice"]!!.jsonObject["device"]!!.jsonPrimitive.content)
+        assertEquals(
+            "ion-1",
+            body["sealed"]!!.jsonArray[0].jsonObject["toDevice"]!!.jsonObject["device"]!!.jsonPrimitive.content
+        )
     }
 
     @Test
@@ -81,7 +84,10 @@ class HttpChatApiTest {
 
     @Test
     fun socketMessagesDecodeAndUnknownOnesAreSkipped() {
-        val signal = api.decodeSignal("""{"type":"message","id":"m1","conversationId":"c1","from":{"account":"a","device":"d"},"blob":"eA==","sentAt":5}""")
+        val signal = api.decodeSignal(
+            """{"type":"message","id":"m1","conversationId":"c1","from":{"account":"a","device":"d"},""" +
+                """"blob":"eA==","sentAt":5}"""
+        )
         assertEquals("m1", (signal as ChatSignal.Incoming).message.id)
         assertEquals(null, api.decodeSignal("""{"type":"typing"}"""))
         assertEquals(null, api.decodeSignal("junk"))

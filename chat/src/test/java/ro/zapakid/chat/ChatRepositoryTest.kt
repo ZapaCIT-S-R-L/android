@@ -1,5 +1,6 @@
 package ro.zapakid.chat
 
+import java.util.Base64
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -16,7 +17,6 @@ import ro.zapakid.chat.net.ChatApi
 import ro.zapakid.chat.net.SealedFor
 import ro.zapakid.chat.net.WireConversation
 import ro.zapakid.chat.net.WireMessage
-import java.util.Base64
 
 /** Two phones talking through a fake chat service: only sealed blobs and ciphertext ever reach it. */
 class ChatRepositoryTest {
@@ -26,11 +26,18 @@ class ChatRepositoryTest {
 
     /** Bound to sender and recipient like a Signal session. Not encryption; tests only. */
     private class Sealer(private val self: ChatDevice) : MessageSealer {
-        override suspend fun seal(plaintext: ByteArray, toDevice: ChatDevice) = "${toDevice.device}|${self.device}|".encodeToByteArray() + plaintext.reversedArray()
+        override suspend fun seal(plaintext: ByteArray, toDevice: ChatDevice) =
+            "${toDevice.device}|${self.device}|".encodeToByteArray() + plaintext.reversedArray()
 
         override suspend fun open(blob: ByteArray, fromDevice: ChatDevice): ByteArray {
             val header = "${self.device}|${fromDevice.device}|".encodeToByteArray()
-            if (!blob.copyOfRange(0, minOf(header.size, blob.size)).contentEquals(header)) throw MessageSealerException("not for me")
+            if (!blob.copyOfRange(
+                    0,
+                    minOf(header.size, blob.size)
+                ).contentEquals(header)
+            ) {
+                throw MessageSealerException("not for me")
+            }
             return blob.copyOfRange(header.size, blob.size).reversedArray()
         }
     }
@@ -44,7 +51,12 @@ class ChatRepositoryTest {
 
         override suspend fun conversations() = listOf(WireConversation("c1", null, false, listOf("ana", "ion")))
 
-        override suspend fun createConversation(members: List<String>, title: String?) = WireConversation("c2", title, members.size > 2, members)
+        override suspend fun createConversation(members: List<String>, title: String?) = WireConversation(
+            "c2",
+            title,
+            members.size > 2,
+            members
+        )
 
         override suspend fun devices(conversationId: String) =
             listOf(ChatDevice("ana", "ana-1"), ChatDevice("ion", "ion-1"), ChatDevice("ion", "ion-2"))
@@ -60,7 +72,10 @@ class ChatRepositoryTest {
             acked += messageIds
         }
 
-        override suspend fun upload(conversationId: String, encrypted: ByteArray) = "att-${blobs.size}".also { blobs[it] = encrypted }
+        override suspend fun upload(conversationId: String, encrypted: ByteArray) = "att-${blobs.size}".also {
+            blobs[it] =
+                encrypted
+        }
 
         override suspend fun download(attachmentId: String) = blobs.getValue(attachmentId)
     }
@@ -83,7 +98,12 @@ class ChatRepositoryTest {
 
         val sealed = server.sent.single().third
         assertEquals(setOf(ion, ionTablet), sealed.map { it.toDevice }.toSet())
-        assertFalse("the server never sees the text", sealed.any { Base64.getDecoder().decode(it.blob).decodeToString().contains("Hi Ion") })
+        assertFalse(
+            "the server never sees the text",
+            sealed.any {
+                Base64.getDecoder().decode(it.blob).decodeToString().contains("Hi Ion")
+            }
+        )
         assertEquals(MessageStatus.Sent, anaStore.messages("c1").first().single().status)
 
         for (device in listOf(ion, ionTablet)) {

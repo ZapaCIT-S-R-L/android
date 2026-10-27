@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_title">Mesaje</string>
+    <string name="chat_empty">Niciun mesaj încă. Salută-ți familia!</string>
+    <plurals name="chat_unread">
+        <item quantity="one">%1$d mesaj nou</item>
+        <item quantity="few">%1$d mesaje noi</item>
+        <item quantity="other">%1$d de mesaje noi</item>
+    </plurals>
+    <string name="chat_back">Înapoi</string>
+    <string name="chat_call">Sună pe %1$s</string>
+    <string name="chat_photo">Trimite o poză</string>
+    <string name="chat_photo_received">Poză</string>
+    <string name="chat_photo_open">Arată poza</string>
+    <string name="chat_type">Scrie un mesaj</string>
+    <string name="chat_send">Trimite</string>
+    <string name="chat_voice">Înregistrează un mesaj vocal</string>
+    <string name="chat_voice_stop">Oprește și trimite</string>
+    <string name="chat_voice_note">Mesaj vocal, %1$d s. Ascultă</string>
+    <string name="chat_sending">Se trimite…</string>
+    <string name="chat_failed">Netrimis. Apasă ca să încerci din nou</string>
+</resources>
