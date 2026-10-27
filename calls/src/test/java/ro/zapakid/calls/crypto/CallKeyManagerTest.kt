@@ -106,10 +106,10 @@ class CallKeyManagerTest {
         val phoneB = Phone(b)
         val phoneC = Phone(c)
         listOf(phoneB, phoneC).forEach { it.keys.onRoster(listOf(a, b, c)) }
-        // C pretends to be the leader.
-        val forged = CallKeyManager("call-1", c, FakeCallKeySealer(c), KeyRing())
-        forged.onRoster(listOf(c, b))
-        val envelope = forged.onRoster(listOf(c, b, a)).single { it.toDevice == b }
+        // C pretends to be the leader and seals its own key to B.
+        val forgedKey = CallKey.random(9, java.security.SecureRandom())
+        val blob = FakeCallKeySealer(c).seal(SealedKeyPayload.encode("call-1", forgedKey), b)
+        val envelope = KeyEnvelope(9, c, b, blob)
 
         assertFalse(phoneB.keys.onEnvelope(envelope))
         assertNull(phoneB.ring.current)
@@ -165,6 +165,34 @@ class CallKeyManagerTest {
         assertArrayEquals(key.bytes(), SealedKeyPayload.decode(payload, "call-1", 5).bytes())
         assertNull(runCatching { SealedKeyPayload.decode(payload, "call-2", 5) }.getOrNull())
         assertNull(runCatching { SealedKeyPayload.decode(payload, "call-1", 6) }.getOrNull())
+    }
+
+    @Test
+    fun theSealedPayloadIsTheSameBytesAsOnIos() {
+        val key = CallKey.of(0x01020304, ByteArray(32) { it.toByte() })
+
+        val payload = SealedKeyPayload.encode("c1", key)
+
+        val expected = "ZKCK".encodeToByteArray() + byteArrayOf(1, 1, 2, 3, 4) + ByteArray(32) { it.toByte() } + "c1".encodeToByteArray()
+        assertArrayEquals(expected, payload)
+    }
+
+    @Test
+    fun theLowestDeviceIdLeadsWhateverTheJoinOrder() = runTest {
+        val phoneB = Phone(b)
+
+        assertTrue("acc-b.dev-b sorts before acc-c.dev-c", phoneB.keys.onRoster(listOf(c, b)).isNotEmpty())
+        assertEquals(emptyList<KeyEnvelope>(), Phone(c).keys.onRoster(listOf(c, b)))
+    }
+
+    @Test
+    fun theServersEpochIsUsedWhenKnown() = runTest {
+        val phoneA = Phone(a)
+
+        val envelopes = phoneA.keys.onRoster(listOf(a, b), serverEpoch = 7)
+
+        assertEquals(7, envelopes.single().epoch)
+        assertEquals(7, phoneA.ring.current?.epoch)
     }
 
     @Test

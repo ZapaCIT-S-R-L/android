@@ -47,13 +47,18 @@ class HttpCallsApiTest {
         """[{"urls":["stun:stun.cloudflare.com:3478","turn:turn.cloudflare.com:3478?transport=udp"],
            "username":"u1","credential":"c1"}]"""
 
+    private val callJson =
+        """{"callId":"call-1","conversationId":"conv-9","state":"ringing","createdAt":"x","ringDeadline":"y","epoch":1,
+           "keyLeader":{"accountId":"acc-a","deviceId":1},"participants":[],"declined":[],"endReason":null}"""
+
     @Test
     fun startingACallSendsTheConversationWithTheChatTokenAndReturnsIceServers() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"callId":"call-1","iceServers":$iceJson}"""))
+        server.enqueue(MockResponse(code = 201, body = """{"call":$callJson,"iceServers":$iceJson,"limits":{"maxParticipants":8,"ringTimeoutSeconds":45,"maxDurationSeconds":7200}}"""))
 
         val call = api.create("conv-9")
 
         assertEquals("call-1", call.callId)
+        assertEquals(1, call.epoch)
         assertEquals(
             listOf("stun:stun.cloudflare.com:3478", "turn:turn.cloudflare.com:3478?transport=udp"),
             call.iceServers.single().urls
@@ -68,7 +73,7 @@ class HttpCallsApiTest {
 
     @Test
     fun joinLeaveAndDeclineHitTheirPaths() = runTest {
-        server.enqueue(MockResponse(code = 200, body = """{"callId":"call-1","iceServers":$iceJson}"""))
+        server.enqueue(MockResponse(code = 200, body = """{"call":$callJson,"iceServers":$iceJson}"""))
         server.enqueue(MockResponse(code = 204))
         server.enqueue(MockResponse(code = 204))
 
@@ -213,7 +218,9 @@ class HttpCallsApiTest {
         val close = server.takeRequest()
         assertEquals("PUT", close.method)
         assertEquals("/v1/calls/call-1/sessions/sess-1/tracks/close", close.url.encodedPath)
-        assertEquals("1", body(close.body!!.utf8())["tracks"]!!.jsonArray[0].jsonObject["mid"]!!.jsonPrimitive.content)
+        val closeBody = body(close.body!!.utf8())
+        assertEquals("1", closeBody["tracks"]!!.jsonArray[0].jsonObject["mid"]!!.jsonPrimitive.content)
+        assertEquals("force is required by the calls API", "false", closeBody["force"]!!.jsonPrimitive.content)
     }
 
     @Test
