@@ -186,7 +186,10 @@ class HttpDeviceApiTest {
         val attested = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client(), attestation)
         server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQidentity","changes":[]}"""))
 
-        attested.accountHasIdentity("zks_tok0000000000000000000000000000000000000000", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11")
+        attested.accountHasIdentity(
+            "zks_tok0000000000000000000000000000000000000000",
+            "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+        )
 
         assertEquals(null, server.takeRequest().headers["ZapaKid-Attestation"])
         assertTrue(attestation.hashes.isEmpty())

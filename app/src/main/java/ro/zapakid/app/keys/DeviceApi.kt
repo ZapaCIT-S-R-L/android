@@ -8,8 +8,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import ro.zapakid.app.auth.Attestation
 import ro.zapakid.app.auth.AuthApiException
+import ro.zapakid.app.auth.RequestAttestation
 import ro.zapakid.app.auth.readOrThrow
+import ro.zapakid.app.auth.tokenFor
 
 /**
  * The key directory (openapi.yaml, "Draft: Devices and keys"):
@@ -23,7 +26,12 @@ interface DeviceApi {
     suspend fun accountHasIdentity(token: String, accountId: String): Boolean
 }
 
-class HttpDeviceApi(private val baseUrl: HttpUrl, private val client: OkHttpClient) : DeviceApi {
+class HttpDeviceApi(
+    private val baseUrl: HttpUrl,
+    private val client: OkHttpClient,
+    /** Play Integrity on registration, like sign-in (openapi.yaml: required on POST /v1/devices). */
+    private val attestation: RequestAttestation? = null
+) : DeviceApi {
     @Serializable
     private class Registered(val deviceId: Int)
 
@@ -31,8 +39,10 @@ class HttpDeviceApi(private val baseUrl: HttpUrl, private val client: OkHttpClie
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
     override suspend fun register(token: String, keys: DeviceKeys): Int {
-        val body = json.encodeToString(DeviceKeys.serializer(), keys).toRequestBody(jsonType)
-        val text = execute(request("devices", token).post(body).build())
+        val bytes = json.encodeToString(DeviceKeys.serializer(), keys).encodeToByteArray()
+        val request = request("devices", token).post(bytes.toRequestBody(jsonType))
+        attestation.tokenFor(bytes)?.let { request.header(Attestation.HEADER, it) }
+        val text = execute(request.build())
         val deviceId = json.decodeFromString(Registered.serializer(), text).deviceId
         if (deviceId !in DEVICE_IDS) throw AuthApiException(HTTP_BAD_GATEWAY, "invalid_response", "Device ID $deviceId")
         return deviceId

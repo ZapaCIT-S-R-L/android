@@ -53,13 +53,15 @@ class AppGraph(
             .build()
     }
 
+    private val integrity by lazy { PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER) }
+
     val authRepository: AuthRepository by lazy {
         AuthRepository(
             api =
                 api ?: HttpAuthApi(
                     BuildConfig.API_BASE_URL.toHttpUrl(),
                     http,
-                    PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+                    integrity
                 ),
             store = store ?: EncryptedSessionStore(File(app.noBackupFilesDir, "session.bin"), KeystoreBlobCipher()),
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
@@ -75,7 +77,7 @@ class AppGraph(
     val deviceRegistration: DeviceRegistrar by lazy {
         deviceRegistrar ?: DeviceRegistration(
             accounts = accountKeys,
-            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http),
+            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http, integrity),
             session = authRepository::currentSession,
             // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
             reshare = {}
