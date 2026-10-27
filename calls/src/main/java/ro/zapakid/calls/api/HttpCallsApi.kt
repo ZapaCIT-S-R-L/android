@@ -25,16 +25,18 @@ class HttpCallsApi(
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
+        encodeDefaults = true
     }
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    override suspend fun create(conversationId: String): CallTicket = decode(
-        CallTicket.serializer(),
+    override suspend fun create(conversationId: String): CallTicket = ticket(
         send("POST", listOf("calls"), encode(CreateCallRequest.serializer(), CreateCallRequest(conversationId)))
     )
 
-    override suspend fun join(callId: String): CallTicket =
-        decode(CallTicket.serializer(), send("POST", listOf("calls", callId, "join"), EMPTY))
+    override suspend fun join(callId: String): CallTicket = ticket(send("POST", listOf("calls", callId, "join"), EMPTY))
+
+    private fun ticket(text: String): CallTicket =
+        decode(CallGrant.serializer(), text).let { CallTicket(it.call.callId, it.iceServers, it.call.epoch) }
 
     override suspend fun leave(callId: String) {
         send("POST", listOf("calls", callId, "leave"), EMPTY)

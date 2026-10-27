@@ -23,7 +23,8 @@ import ro.zapakid.calls.crypto.KeyRing
  *     CALLS_E2E_URL=http://127.0.0.1:8787/v1/ CALLS_E2E_CONVERSATION=conv-e2e \
  *     CALLS_E2E_TOKEN_A=… CALLS_E2E_TOKEN_B=… ./gradlew :calls:testDebugUnitTest --tests '*CallsE2eTest*'
  *
- * The tokens are test chat tokens for two devices in that conversation, minted by the service's test issuer.
+ * The tokens are test chat tokens for two devices in that conversation, minted by the service's test issuer;
+ * CALLS_E2E_DEVICE_A/B are their libsignal device ids (1-127). Device A must sort first (`<account>.<device>`).
  */
 class CallsE2eTest {
     private val url = System.getenv("CALLS_E2E_URL")
@@ -53,12 +54,13 @@ class CallsE2eTest {
         val apiB = HttpCallsApi(base, http, tokenB)
 
         val ticket = apiA.create(env("CALLS_E2E_CONVERSATION"))
-        val socketA = CallEventsClient(base, http, tokenA).connect(ticket.callId)
+        val socketA = CallEventsClient(base, http, tokenA, a).connect(ticket.callId)
         assertEquals(listOf(a), socketA.signals.rosterOf(1).participants.map { it.device })
 
         apiB.join(ticket.callId)
-        val socketB = CallEventsClient(base, http, tokenB).connect(ticket.callId)
-        val roster = socketA.signals.rosterOf(2).participants.map { it.device }
+        val socketB = CallEventsClient(base, http, tokenB, b).connect(ticket.callId)
+        val both = socketA.signals.rosterOf(2)
+        val roster = both.participants.map { it.device }
         assertEquals(listOf(a, b), roster)
 
         val ringA = KeyRing()
@@ -67,7 +69,7 @@ class CallsE2eTest {
         val keysB = CallKeyManager(ticket.callId, b, FakeCallKeySealer(b), ringB)
         keysA.onRoster(listOf(a))
         keysB.onRoster(roster)
-        keysA.onRoster(roster).forEach { assertTrue(socketA.sendKey(it)) }
+        assertTrue(socketA.sendKeys(both.epoch, keysA.onRoster(roster, both.epoch)))
 
         val relayed = withTimeout(TIMEOUT) { socketB.signals.filterIsInstance<CallSignal.Key>().first() }
         assertTrue("B opens the relayed key", keysB.onEnvelope(relayed.envelope))

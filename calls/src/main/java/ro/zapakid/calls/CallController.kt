@@ -203,6 +203,12 @@ class CallController(
         val socket = events.connect(callId)
         connection = socket
         scope.launch { socket.signals.collect { guarded { onSignal(it) } } }
+        scope.launch {
+            while (!finished) {
+                delay(PING_MILLIS)
+                if (!finished) socket.ping()
+            }
+        }
     }
 
     private suspend fun startMedia(ticket: CallTicket) {
@@ -214,7 +220,7 @@ class CallController(
 
     private suspend fun onSignal(signal: CallSignal) {
         when (signal) {
-            is CallSignal.Roster -> onRoster(signal.participants)
+            is CallSignal.Roster -> onRoster(signal.participants, signal.epoch)
 
             is CallSignal.Key ->
                 if (keys?.onEnvelope(signal.envelope) == true) {
@@ -224,9 +230,13 @@ class CallController(
 
             is CallSignal.Declined -> if (++declines >= expectedOthers) dispatch(CallEvent.RemoteDeclined)
 
+            is CallSignal.ServerError -> Unit
+
+            // stale_epoch: the next roster brings the current epoch
+
             CallSignal.RingTimeout -> dispatch(CallEvent.RingTimeout)
 
-            is CallSignal.Ended -> dispatch(CallEvent.RemoteEnded)
+            is CallSignal.Ended -> dispatch(endEvent(signal.reason))
 
             is CallSignal.Disconnected -> if (busy) lost()
 
@@ -234,7 +244,14 @@ class CallController(
         }
     }
 
-    private suspend fun onRoster(participants: List<Participant>) {
+    /** The calls service's end reasons as call events (`no_answer` while ringing is the ring timeout). */
+    private fun endEvent(reason: String): CallEvent = when (reason) {
+        "no_answer" -> CallEvent.RingTimeout
+        "declined" -> CallEvent.RemoteDeclined
+        else -> CallEvent.RemoteEnded
+    }
+
+    private suspend fun onRoster(participants: List<Participant>, epoch: Int) {
         val devices = participants.map { it.device }
         val others = participants.filter { it.device != self }
         mutableState.update { state ->
@@ -247,7 +264,8 @@ class CallController(
         if (self !in devices) return
         val manager = keys ?: return
         val before = manager.currentEpoch
-        manager.onRoster(devices).forEach { connection?.sendKey(it) }
+        val envelopes = manager.onRoster(devices, serverEpoch = epoch)
+        envelopes.firstOrNull()?.let { connection?.sendKeys(it.epoch, envelopes) }
         if (manager.currentEpoch != before) {
             engine.onKeyRotated(manager.currentEpoch)
             keyChanged()
@@ -292,7 +310,7 @@ class CallController(
     /** In call only with audio flowing and a key in place: nothing is ever sent unencrypted. */
     private fun connectedIfReady() {
         val waiting = mutableState.value.phase.let { it == CallState.Connecting || it == CallState.Reconnecting }
-        if (waiting && mediaUp && ring.current != null) {
+        if (waiting && mediaUp && keys?.hasCurrentKey == true) {
             dispatch(CallEvent.MediaConnected)
             mutableState.update { it.copy(connectedAtMillis = it.connectedAtMillis ?: clock()) }
         }
@@ -392,5 +410,6 @@ class CallController(
 
     private companion object {
         const val MILLIS = 1000L
+        const val PING_MILLIS = 30_000L
     }
 }
