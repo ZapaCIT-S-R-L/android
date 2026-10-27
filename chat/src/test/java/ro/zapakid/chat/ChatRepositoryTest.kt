@@ -1,6 +1,5 @@
 package ro.zapakid.chat
 
-import java.util.Base64
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -10,71 +9,83 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ro.zapakid.chat.crypto.AttachmentCipher
+import ro.zapakid.chat.crypto.CiphertextType
 import ro.zapakid.chat.crypto.MessageSealer
 import ro.zapakid.chat.crypto.MessageSealerException
+import ro.zapakid.chat.crypto.Sealed
 import ro.zapakid.chat.data.InMemoryChatStore
 import ro.zapakid.chat.net.ChatApi
-import ro.zapakid.chat.net.SealedFor
+import ro.zapakid.chat.net.ChatApiException
+import ro.zapakid.chat.net.EnvelopePage
+import ro.zapakid.chat.net.OutgoingEnvelope
+import ro.zapakid.chat.net.Upload
 import ro.zapakid.chat.net.WireConversation
-import ro.zapakid.chat.net.WireMessage
+import ro.zapakid.chat.net.WireEnvelope
+import ro.zapakid.chat.net.WireMember
+import ro.zapakid.chat.net.WireMemberDevice
+import java.util.Base64
 
-/** Two phones talking through a fake chat service: only sealed blobs and ciphertext ever reach it. */
+/** Phones talking through a fake chat service (services/chat/openapi.yaml): only sealed blobs reach it. */
 class ChatRepositoryTest {
-    private val ana = ChatDevice("ana", "ana-1")
-    private val ion = ChatDevice("ion", "ion-1")
-    private val ionTablet = ChatDevice("ion", "ion-2")
+    private val ana = ChatDevice("ana", 1)
+    private val ion = ChatDevice("ion", 1)
+    private val ionTablet = ChatDevice("ion", 2)
 
     /** Bound to sender and recipient like a Signal session. Not encryption; tests only. */
     private class Sealer(private val self: ChatDevice) : MessageSealer {
         override suspend fun seal(plaintext: ByteArray, toDevice: ChatDevice) =
-            "${toDevice.device}|${self.device}|".encodeToByteArray() + plaintext.reversedArray()
+            Sealed(CiphertextType.Message, "${toDevice.id}|${self.id}|".encodeToByteArray() + plaintext.reversedArray())
 
-        override suspend fun open(blob: ByteArray, fromDevice: ChatDevice): ByteArray {
-            val header = "${self.device}|${fromDevice.device}|".encodeToByteArray()
-            if (!blob.copyOfRange(
-                    0,
-                    minOf(header.size, blob.size)
-                ).contentEquals(header)
-            ) {
+        override suspend fun open(type: CiphertextType, content: ByteArray, fromDevice: ChatDevice): ByteArray {
+            val header = "${self.id}|${fromDevice.id}|".encodeToByteArray()
+            if (!content.copyOfRange(0, minOf(header.size, content.size)).contentEquals(header)) {
                 throw MessageSealerException("not for me")
             }
-            return blob.copyOfRange(header.size, blob.size).reversedArray()
+            return content.copyOfRange(header.size, content.size).reversedArray()
         }
     }
 
     private class Server : ChatApi {
-        val sent = mutableListOf<Triple<String, String, List<SealedFor>>>()
+        val sent = mutableListOf<Triple<String, String, List<OutgoingEnvelope>>>()
         val blobs = mutableMapOf<String, ByteArray>()
-        var failSend = false
-        var pending = listOf<WireMessage>()
+        var failSend: Exception? = null
+        var ionDevices = listOf(WireMemberDevice(1, 101), WireMemberDevice(2, 102))
+        var queued = listOf<WireEnvelope>()
         val acked = mutableListOf<String>()
 
-        override suspend fun conversations() = listOf(WireConversation("c1", null, false, listOf("ana", "ion")))
+        private fun c1() =
+            WireConversation(
+                "c1",
+                "direct",
+                "open",
+                listOf(WireMember("ana", devices = listOf(WireMemberDevice(1, 11))), WireMember("ion", devices = ionDevices))
+            )
 
-        override suspend fun createConversation(members: List<String>, title: String?) = WireConversation(
-            "c2",
-            title,
-            members.size > 2,
-            members
-        )
+        override suspend fun conversations() = listOf(c1())
 
-        override suspend fun devices(conversationId: String) =
-            listOf(ChatDevice("ana", "ana-1"), ChatDevice("ion", "ion-1"), ChatDevice("ion", "ion-2"))
+        override suspend fun conversation(id: String) = c1()
 
-        override suspend fun send(conversationId: String, messageId: String, sealed: List<SealedFor>) {
-            check(!failSend) { "offline" }
-            sent += Triple(conversationId, messageId, sealed)
+        override suspend fun createConversation(members: List<String>) = c1()
+
+        override suspend fun send(conversationId: String, messageId: String, envelopes: List<OutgoingEnvelope>): Long {
+            failSend?.let {
+                failSend = null
+                throw it
+            }
+            sent += Triple(conversationId, messageId, envelopes)
+            return 5
         }
 
-        override suspend fun pending() = pending
+        override suspend fun fetch(conversationId: String, limit: Int) = EnvelopePage(queued, false)
 
-        override suspend fun ack(messageIds: List<String>) {
-            acked += messageIds
+        override suspend fun ack(conversationId: String, envelopeIds: List<String>) {
+            acked += envelopeIds
         }
 
-        override suspend fun upload(conversationId: String, encrypted: ByteArray) = "att-${blobs.size}".also {
-            blobs[it] =
-                encrypted
+        override suspend fun createAttachment(conversationId: String, size: Long) = Upload("a_${blobs.size}", "https://up/${blobs.size}")
+
+        override suspend fun upload(uploadUrl: String, encrypted: ByteArray) {
+            blobs["a_" + uploadUrl.substringAfterLast('/')] = encrypted
         }
 
         override suspend fun download(attachmentId: String) = blobs.getValue(attachmentId)
@@ -86,61 +97,61 @@ class ChatRepositoryTest {
 
     private fun phone(device: ChatDevice) = ChatRepository(server, InMemoryChatStore(), Sealer(device), device)
 
-    private fun relayedTo(device: ChatDevice): WireMessage {
-        val (conversation, id, sealed) = server.sent.last()
-        return WireMessage(id, conversation, ana, sealed.single { it.toDevice == device }.blob, 1000)
+    private fun relayedTo(device: ChatDevice, n: Int = 0): WireEnvelope {
+        val (conversation, id, envelopes) = server.sent.last()
+        val copy = envelopes.single { it.recipientAccountId == device.account && it.recipientDeviceId == device.device }
+        return WireEnvelope("e-$n-${device.id}", conversation, id, ana.account, ana.device, copy.type, copy.content, 5)
     }
 
     @Test
-    fun aTextIsSealedForEveryOtherDeviceAndOpensOnEach() = runTest {
+    fun aTextIsSealedForEveryOtherDeviceWithItsRegistrationId() = runTest {
         anaPhone.refreshConversations()
         anaPhone.sendText("c1", "  Hi Ion!  ")
 
-        val sealed = server.sent.single().third
-        assertEquals(setOf(ion, ionTablet), sealed.map { it.toDevice }.toSet())
-        assertFalse(
-            "the server never sees the text",
-            sealed.any {
-                Base64.getDecoder().decode(it.blob).decodeToString().contains("Hi Ion")
-            }
-        )
+        val envelopes = server.sent.single().third
+        assertEquals(listOf(1 to 101, 2 to 102), envelopes.map { it.recipientDeviceId to it.recipientRegistrationId })
+        assertTrue(envelopes.all { it.type == "message" })
+        assertFalse(envelopes.any { Base64.getDecoder().decode(it.content).decodeToString().contains("Hi Ion") })
         assertEquals(MessageStatus.Sent, anaStore.messages("c1").first().single().status)
 
         for (device in listOf(ion, ionTablet)) {
             val repo = phone(device)
             assertTrue(repo.receive(relayedTo(device)))
-            val got = repo.messages("c1").first().single()
-            assertEquals("Hi Ion!", got.text)
-            assertFalse(got.mine)
+            assertEquals("Hi Ion!", repo.messages("c1").first().single().text)
         }
     }
 
     @Test
-    fun aMessageForAnotherDeviceOrReplayedIsNotStoredTwice() = runTest {
+    fun aStaleDeviceListIsRefreshedAndTheSendRetriedOnce() = runTest {
+        anaPhone.refreshConversations()
+        server.ionDevices = listOf(WireMemberDevice(1, 101), WireMemberDevice(3, 103))
+        server.failSend = ChatApiException(409, "devices_mismatch", "missing ion.3")
+
+        anaPhone.sendText("c1", "hello")
+
+        assertEquals(listOf(1, 3), server.sent.single().third.map { it.recipientDeviceId })
+        assertEquals(MessageStatus.Sent, anaStore.messages("c1").first().single().status)
+    }
+
+    @Test
+    fun aMessageForAnotherDeviceDuplicateOrRelabelledIsNotStored() = runTest {
         anaPhone.sendText("c1", "hello")
         val ionPhone = phone(ion)
 
         assertFalse(ionPhone.receive(relayedTo(ionTablet)))
+        assertFalse("relabelled", ionPhone.receive(relayedTo(ion).copy(messageId = "other")))
         assertTrue(ionPhone.receive(relayedTo(ion)))
-        assertFalse("duplicate", ionPhone.receive(relayedTo(ion)))
+        assertFalse("duplicate", ionPhone.receive(relayedTo(ion, 1)))
         assertEquals(1, ionPhone.messages("c1").first().size)
     }
 
     @Test
-    fun theServerCannotRelabelAMessageId() = runTest {
-        anaPhone.sendText("c1", "hello")
-
-        assertFalse(phone(ion).receive(relayedTo(ion).copy(id = "other")))
-    }
-
-    @Test
     fun aFailedSendIsMarkedAndCanBeRetried() = runTest {
-        server.failSend = true
+        server.failSend = ChatApiException(503, "unavailable", "x")
         anaPhone.sendText("c1", "hello")
         val failed = anaStore.messages("c1").first().single()
         assertEquals(MessageStatus.Failed, failed.status)
 
-        server.failSend = false
         anaPhone.retry(failed)
 
         assertEquals(MessageStatus.Sent, anaStore.messages("c1").first().single().status)
@@ -148,7 +159,7 @@ class ChatRepositoryTest {
     }
 
     @Test
-    fun photosAndVoiceNotesTravelAsCiphertextWithTheKeyInsideTheSeal() = runTest {
+    fun photosTravelAsCiphertextThroughTheOneTimeUrl() = runTest {
         val photo = ByteArray(2048) { it.toByte() }
         anaPhone.sendMedia("c1", MessageKind.Image, photo, "image/jpeg")
 
@@ -157,7 +168,7 @@ class ChatRepositoryTest {
         val ionPhone = phone(ion)
         ionPhone.receive(relayedTo(ion))
         val message = ionPhone.messages("c1").first().single()
-        assertEquals(MessageKind.Image, message.kind)
+        assertEquals("a_0", message.attachment?.id)
         assertArrayEquals(photo, ionPhone.openAttachment(message.attachment!!))
     }
 
@@ -173,15 +184,15 @@ class ChatRepositoryTest {
     }
 
     @Test
-    fun offlineMessagesAreStoredThenAcknowledged() = runTest {
+    fun queuedMessagesAreStoredThenAcknowledgedByDeliveryId() = runTest {
         anaPhone.sendText("c1", "while you were away")
-        server.pending = listOf(relayedTo(ion))
+        server.queued = listOf(relayedTo(ion))
         val ionPhone = phone(ion)
 
-        ionPhone.sync()
+        ionPhone.sync("c1")
 
         assertEquals("while you were away", ionPhone.messages("c1").first().single().text)
-        assertEquals(listOf(server.sent.single().second), server.acked)
+        assertEquals(listOf("e-0-ion.1"), server.acked)
         assertEquals(1, ionPhone.conversations().first().single().unread)
     }
 
