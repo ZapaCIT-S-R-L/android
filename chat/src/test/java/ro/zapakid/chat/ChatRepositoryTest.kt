@@ -1,5 +1,6 @@
 package ro.zapakid.chat
 
+import java.util.Base64
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -23,7 +24,6 @@ import ro.zapakid.chat.net.WireConversation
 import ro.zapakid.chat.net.WireEnvelope
 import ro.zapakid.chat.net.WireMember
 import ro.zapakid.chat.net.WireMemberDevice
-import java.util.Base64
 
 /** Phones talking through a fake chat service (services/chat/openapi.yaml): only sealed blobs reach it. */
 class ChatRepositoryTest {
@@ -53,13 +53,15 @@ class ChatRepositoryTest {
         var queued = listOf<WireEnvelope>()
         val acked = mutableListOf<String>()
 
-        private fun c1() =
-            WireConversation(
-                "c1",
-                "direct",
-                "open",
-                listOf(WireMember("ana", devices = listOf(WireMemberDevice(1, 11))), WireMember("ion", devices = ionDevices))
+        private fun c1() = WireConversation(
+            "c1",
+            "direct",
+            "open",
+            listOf(
+                WireMember("ana", devices = listOf(WireMemberDevice(1, 11))),
+                WireMember("ion", devices = ionDevices)
             )
+        )
 
         override suspend fun conversations() = listOf(c1())
 
@@ -82,7 +84,8 @@ class ChatRepositoryTest {
             acked += envelopeIds
         }
 
-        override suspend fun createAttachment(conversationId: String, size: Long) = Upload("a_${blobs.size}", "https://up/${blobs.size}")
+        override suspend fun createAttachment(conversationId: String, size: Long) =
+            Upload("a_${blobs.size}", "https://up/${blobs.size}")
 
         override suspend fun upload(uploadUrl: String, encrypted: ByteArray) {
             blobs["a_" + uploadUrl.substringAfterLast('/')] = encrypted

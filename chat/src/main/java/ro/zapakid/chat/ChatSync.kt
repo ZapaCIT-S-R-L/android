@@ -1,48 +1,53 @@
 package ro.zapakid.chat
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import ro.zapakid.chat.net.ChatApi
 import ro.zapakid.chat.net.ChatSignal
 import ro.zapakid.chat.net.ChatSocket
 
 /**
- * Keeps the live socket open while the app is in front: catches up with [ChatRepository.sync] on every connect,
- * then stores and acknowledges messages as they arrive. Reconnects with backoff (1 s doubling to 30 s).
+ * Keeps one live stream per conversation open while the app is in front (the chat service runs one per
+ * conversation): catches up on every connect, stores then acknowledges envelopes as they arrive, refreshes devices
+ * on membership events, and reconnects with backoff (1 s doubling to 30 s).
  */
-class ChatSync(
-    private val repository: ChatRepository,
-    private val socket: ChatSocket,
-    private val ack: suspend (List<String>) -> Unit
-) {
+class ChatSync(private val repository: ChatRepository, private val socket: ChatSocket, private val api: ChatApi) {
     private val mutableOnline = MutableStateFlow(false)
     val online: StateFlow<Boolean> = mutableOnline
 
+    suspend fun run() = coroutineScope {
+        val conversations = runCatching { repository.refreshConversations() }.getOrDefault(emptyList())
+        mutableOnline.value = conversations.isNotEmpty()
+        conversations.forEach { id -> launch { stream(id) } }
+    }
+
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // a broken socket just reconnects
-    suspend fun run() {
+    private suspend fun stream(conversationId: String) {
         var backoff = FIRST_BACKOFF
         while (true) {
             try {
-                socket.connect().collect { signal ->
+                socket.connect(conversationId).collect { signal ->
                     when (signal) {
                         ChatSignal.Connected -> {
-                            mutableOnline.value = true
                             backoff = FIRST_BACKOFF
-                            repository.refreshConversations()
-                            repository.sync()
+                            repository.sync(conversationId)
                         }
 
                         is ChatSignal.Incoming -> {
-                            repository.receive(signal.message)
-                            ack(listOf(signal.message.id))
+                            repository.receive(signal.envelope)
+                            api.ack(conversationId, listOf(signal.envelope.id))
                         }
 
-                        is ChatSignal.Disconnected -> mutableOnline.value = false
+                        is ChatSignal.Event -> repository.refresh(conversationId)
+
+                        is ChatSignal.Disconnected -> Unit
                     }
                 }
             } catch (e: CancellationException) {
-                mutableOnline.value = false
                 throw e
             } catch (e: Exception) {
                 mutableOnline.value = false

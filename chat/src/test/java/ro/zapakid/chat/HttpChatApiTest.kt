@@ -66,7 +66,12 @@ class HttpChatApiTest {
 
     @Test
     fun aStaleDeviceListIsAClearError() = runTest {
-        server.enqueue(MockResponse(code = 409, body = """{"error":{"code":"devices_mismatch","message":"x"},"missingDevices":[],"extraDevices":[]}"""))
+        server.enqueue(
+            MockResponse(
+                code = 409,
+                body = """{"error":{"code":"devices_mismatch","message":"x"},"missingDevices":[],"extraDevices":[]}"""
+            )
+        )
 
         try {
             api.send("c1", "m1", emptyList())
@@ -81,7 +86,10 @@ class HttpChatApiTest {
     fun refreshesTheTokenOnceAfter401() = runTest {
         server.enqueue(MockResponse(code = 401))
         server.enqueue(
-            MockResponse(code = 200, body = """{"conversations":[{"id":"c1","kind":"direct","state":"open","createdAt":"x","members":[]}]}""")
+            MockResponse(
+                code = 200,
+                body = """{"conversations":[{"id":"c1","kind":"direct","state":"open","createdAt":"x","members":[]}]}"""
+            )
         )
 
         assertEquals("c1", api.conversations().single().id)
@@ -104,14 +112,29 @@ class HttpChatApiTest {
         assertEquals("/v1/conversations/c1/messages", server.takeRequest().url.encodedPath)
         val ack = server.takeRequest()
         assertEquals("/v1/conversations/c1/acks", ack.url.encodedPath)
-        assertEquals("e1", Json.parseToJsonElement(ack.body!!.utf8()).jsonObject["envelopeIds"]!!.jsonArray[0].jsonPrimitive.content)
+        assertEquals(
+            "e1",
+            Json.parseToJsonElement(ack.body!!.utf8()).jsonObject["envelopeIds"]!!.jsonArray[0].jsonPrimitive.content
+        )
     }
 
     @Test
     fun attachmentsGoThroughOneTimeUrlsWithoutTheToken() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"attachmentId":"a_1","uploadUrl":"${server.url("/up?token=t")}","expiresAt":"x"}"""))
+        server.enqueue(
+            MockResponse(
+                code = 201,
+                body = """{"attachmentId":"a_1","uploadUrl":"${server.url("/up?token=t")}","expiresAt":"x"}"""
+            )
+        )
         server.enqueue(MockResponse(code = 204))
-        server.enqueue(MockResponse(code = 200, body = """{"attachmentId":"a_1","size":3,"downloadUrl":"${server.url("/down?token=u")}","expiresAt":"x"}"""))
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = """{"attachmentId":"a_1","size":3,"downloadUrl":"${server.url(
+                    "/down?token=u"
+                )}","expiresAt":"x"}"""
+            )
+        )
         server.enqueue(MockResponse.Builder().code(200).body(okio.Buffer().write(byteArrayOf(9, 8, 7))).build())
 
         val upload = api.createAttachment("c1", 3)

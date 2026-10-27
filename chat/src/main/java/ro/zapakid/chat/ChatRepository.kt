@@ -6,23 +6,28 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 import ro.zapakid.chat.crypto.AttachmentCipher
+import ro.zapakid.chat.crypto.CiphertextType
 import ro.zapakid.chat.crypto.MessageSealer
 import ro.zapakid.chat.crypto.MessageSealerException
 import ro.zapakid.chat.data.ChatStore
 import ro.zapakid.chat.net.ChatApi
-import ro.zapakid.chat.net.SealedFor
-import ro.zapakid.chat.net.WireMessage
+import ro.zapakid.chat.net.ChatApiException
+import ro.zapakid.chat.net.OutgoingEnvelope
+import ro.zapakid.chat.net.WireConversation
+import ro.zapakid.chat.net.WireEnvelope
 
-/** Names and robots for accounts (from the family and connections). */
+/** Names for accounts (from the family and connections). */
 fun interface ChatPeople {
     fun name(account: String): String
 }
 
 /**
- * Sending and receiving. Every message is sealed per recipient device (and this account's other devices); the
- * chat service stores only those blobs, and attachments only as AES-GCM ciphertext. Received messages are opened,
- * stored in the encrypted database and then acknowledged, so the server can drop them.
+ * Sending and receiving. Every message is sealed for each current device of every member except this one (this
+ * account's other devices included), as services/chat requires; the service only relays those envelopes, and
+ * attachments only as AES-GCM ciphertext. Received envelopes are opened, stored in the encrypted database and
+ * then acknowledged by their delivery id, so the server drops them.
  */
+@Suppress("TooManyFunctions")
 class ChatRepository(
     private val api: ChatApi,
     private val store: ChatStore,
@@ -36,43 +41,40 @@ class ChatRepository(
     private val b64 = Base64.getEncoder()
     private val unb64 = Base64.getDecoder()
 
+    /** Recipients per conversation: every device of every member, with its registration id. */
+    private val recipients = mutableMapOf<String, List<Pair<ChatDevice, Int>>>()
+
     fun conversations(): Flow<List<Conversation>> = store.conversations()
 
     fun messages(conversationId: String): Flow<List<Message>> = store.messages(conversationId)
 
-    /** Pulls the conversation list from the server (titles fall back to the other members' names). */
-    suspend fun refreshConversations() {
-        for (wire in api.conversations()) {
-            val known = store.conversation(wire.id)
-            val others = wire.members.filter { it != self.account }
-            val title = wire.title ?: others.joinToString(", ") { people.name(it) }
-            store.upsertConversation(
-                known?.copy(title = title, members = wire.members, group = wire.group)
-                    ?: Conversation(
-                        wire.id,
-                        title,
-                        Math.floorMod(wire.id.hashCode(), AVATARS),
-                        wire.group,
-                        wire.members
-                    )
-            )
-        }
+    /** Pulls the conversations from the server; titles are the other members' names. */
+    suspend fun refreshConversations(): List<String> = api.conversations().map { remember(it) }
+
+    private suspend fun remember(wire: WireConversation): String {
+        recipients[wire.id] =
+            wire.members.flatMap { m -> m.devices.map { ChatDevice(m.accountId, it.deviceId) to it.registrationId } }
+        val others = wire.members.map { it.accountId }.filter { it != self.account }
+        val title = others.joinToString(", ") { people.name(it) }
+        val known = store.conversation(wire.id)
+        store.upsertConversation(
+            known?.copy(title = title, members = wire.members.map { it.accountId }, group = wire.kind == "group")
+                ?: Conversation(
+                    wire.id,
+                    title,
+                    Math.floorMod(wire.id.hashCode(), AVATARS),
+                    wire.kind == "group",
+                    wire.members.map {
+                        it.accountId
+                    }
+                )
+        )
+        return wire.id
     }
 
-    suspend fun startConversation(members: List<String>, title: String?): Conversation {
-        val wire = api.createConversation(members, title)
-        val conversation =
-            Conversation(
-                wire.id,
-                title ?: members.joinToString(", ") {
-                    people.name(it)
-                },
-                Math.floorMod(wire.id.hashCode(), AVATARS),
-                members.size > 1,
-                wire.members
-            )
-        store.upsertConversation(conversation)
-        return conversation
+    suspend fun startConversation(members: List<String>): Conversation {
+        val id = remember(api.createConversation(members))
+        return checkNotNull(store.conversation(id))
     }
 
     suspend fun sendText(conversationId: String, text: String) {
@@ -92,10 +94,11 @@ class ChatRepository(
     ) {
         require(kind != MessageKind.Text)
         val sealed = AttachmentCipher.encrypt(bytes)
-        val id = api.upload(conversationId, sealed.bytes)
+        val upload = api.createAttachment(conversationId, sealed.bytes.size.toLong())
+        api.upload(upload.uploadUrl, sealed.bytes)
         val ref =
             AttachmentRef(
-                id,
+                upload.attachmentId,
                 b64.encodeToString(sealed.key),
                 b64.encodeToString(sealed.sha256),
                 mime,
@@ -131,7 +134,7 @@ class ChatRepository(
         deliver(conversationId, body)
     }
 
-    /** Tries again after a failure (the same message ID: the receivers drop duplicates). */
+    /** Tries again after a failure (the same message ID: the service and the receivers drop duplicates). */
     suspend fun retry(message: Message) {
         if (!message.mine || message.status != MessageStatus.Failed) return
         store.setStatus(message.id, MessageStatus.Sending)
@@ -145,9 +148,14 @@ class ChatRepository(
     private suspend fun deliver(conversationId: String, body: MessageBody) {
         val plain = json.encodeToString(MessageBody.serializer(), body).encodeToByteArray()
         try {
-            val devices = api.devices(conversationId).filter { it != self }
-            val sealed = devices.map { SealedFor(it, b64.encodeToString(sealer.seal(plain, it))) }
-            api.send(conversationId, body.id, sealed)
+            try {
+                api.send(conversationId, body.id, seal(conversationId, plain))
+            } catch (e: ChatApiException) {
+                // 409/410: a device was added, removed or re-installed. Refresh the devices and seal again, once.
+                if (e.status != CONFLICT && e.status != GONE) throw e
+                remember(api.conversation(conversationId))
+                api.send(conversationId, body.id, seal(conversationId, plain))
+            }
             store.setStatus(body.id, MessageStatus.Sent)
         } catch (e: CancellationException) {
             throw e
@@ -158,12 +166,28 @@ class ChatRepository(
         }
     }
 
-    /** Opens and stores one relayed message; returns false when it can't be opened (it is still acknowledged). */
-    @Suppress("ReturnCount", "SwallowedException") // unopenable messages are dropped, not errors
-    suspend fun receive(wire: WireMessage): Boolean {
+    private suspend fun seal(conversationId: String, plain: ByteArray): List<OutgoingEnvelope> {
+        if (conversationId !in recipients) remember(api.conversation(conversationId))
+        return recipients.getValue(conversationId).filter { it.first != self }.map { (device, registrationId) ->
+            val sealed = sealer.seal(plain, device)
+            OutgoingEnvelope(
+                device.account,
+                device.device,
+                registrationId,
+                sealed.type.wire,
+                b64.encodeToString(sealed.content)
+            )
+        }
+    }
+
+    /** Opens and stores one envelope; false when it can't be opened or was already stored (ack it anyway). */
+    @Suppress("ReturnCount", "SwallowedException") // unopenable envelopes are dropped, not errors
+    suspend fun receive(envelope: WireEnvelope): Boolean {
+        val from = ChatDevice(envelope.senderAccountId, envelope.senderDeviceId)
+        val type = CiphertextType.of(envelope.type) ?: return false
         val plain =
             try {
-                sealer.open(unb64.decode(wire.blob), wire.from)
+                sealer.open(type, unb64.decode(envelope.content), from)
             } catch (e: MessageSealerException) {
                 return false
             } catch (e: IllegalArgumentException) {
@@ -171,14 +195,15 @@ class ChatRepository(
             }
         val body = runCatching { json.decodeFromString(MessageBody.serializer(), plain.decodeToString()) }.getOrNull()
         plain.fill(0)
-        if (body == null || body.id != wire.id) return false
-        if (store.conversation(wire.conversationId) == null) refreshConversations()
+        // The message id is inside the seal: the server can't relabel or replay one message as another.
+        if (body == null || body.id != envelope.messageId) return false
+        if (store.conversation(envelope.conversationId) == null) remember(api.conversation(envelope.conversationId))
         return store.add(
             Message(
                 body.id,
-                wire.conversationId,
-                wire.from.account,
-                wire.from.account == self.account,
+                envelope.conversationId,
+                from.account,
+                from.account == self.account,
                 body.kind,
                 body.text,
                 body.attachment,
@@ -188,11 +213,13 @@ class ChatRepository(
         )
     }
 
-    /** Messages that came while offline: open, store, then acknowledge them all. */
-    suspend fun sync() {
-        val pending = api.pending()
-        pending.forEach { receive(it) }
-        if (pending.isNotEmpty()) api.ack(pending.map { it.id })
+    /** Envelopes queued while this phone was away: open, store, then acknowledge them page by page. */
+    suspend fun sync(conversationId: String) {
+        do {
+            val page = api.fetch(conversationId)
+            page.envelopes.forEach { receive(it) }
+            if (page.envelopes.isNotEmpty()) api.ack(conversationId, page.envelopes.map { it.id })
+        } while (page.more && page.envelopes.isNotEmpty())
     }
 
     /** Downloads, checks and decrypts an attachment. */
@@ -201,7 +228,14 @@ class ChatRepository(
 
     suspend fun markRead(conversationId: String) = store.markRead(conversationId)
 
+    /** Forgets cached devices (a devices_changed or members_changed event). */
+    suspend fun refresh(conversationId: String) {
+        remember(api.conversation(conversationId))
+    }
+
     private companion object {
         const val AVATARS = 8
+        const val CONFLICT = 409
+        const val GONE = 410
     }
 }
