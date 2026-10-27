@@ -30,7 +30,7 @@ class HttpDeviceApiTest {
             signedPreKey = SignedPreKey(7, "BQsigned", "c2ln"),
             pqLastResortPreKey = SignedPreKey(9, "CAkyber", "c2ln"),
             preKeys = listOf(PreKey(8, "BQone")),
-            pqPreKeys = listOf(SignedPreKey(10, "CApq", "c2ln")),
+            pqPreKeys = listOf(SignedPreKey(10, "CApq", "c2ln"))
         )
 
     @Before
@@ -64,7 +64,10 @@ class HttpDeviceApiTest {
         assertEquals("Bearer zks_tok", request.headers["Authorization"])
         assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
         val body = Json.parseToJsonElement(request.body!!.utf8()).jsonObject
-        assertEquals(setOf("registrationId", "identityKey", "signedPreKey", "pqLastResortPreKey", "preKeys", "pqPreKeys"), body.keys)
+        assertEquals(
+            setOf("registrationId", "identityKey", "signedPreKey", "pqLastResortPreKey", "preKeys", "pqPreKeys"),
+            body.keys
+        )
         assertEquals(4242, body["registrationId"]!!.jsonPrimitive.int)
         assertFalse("no push token yet", body.containsKey("pushToken"))
     }
@@ -85,7 +88,11 @@ class HttpDeviceApiTest {
         assertTrue(expectError { api.register("zks_tok", keys) }.isUnauthorized)
 
         server.enqueue(
-            MockResponse(code = 429, headers = headersOf("Retry-After", "60"), body = """{"error":{"code":"rate_limited","message":"x"}}"""),
+            MockResponse(
+                code = 429,
+                headers = headersOf("Retry-After", "60"),
+                body = """{"error":{"code":"rate_limited","message":"x"}}"""
+            )
         )
         assertEquals(60L, expectError { api.register("zks_tok", keys) }.retryAfterSeconds)
     }

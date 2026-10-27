@@ -23,14 +23,14 @@ import ro.zapakid.app.auth.AgeRange
 import ro.zapakid.app.auth.AuthApiException
 import ro.zapakid.app.auth.AuthRepository
 import ro.zapakid.app.auth.Provider
+import ro.zapakid.app.keys.DeviceRegistrar
+import ro.zapakid.app.keys.DeviceRegistration
 import ro.zapakid.app.testing.APPLE_CONFIG
 import ro.zapakid.app.testing.FakeAgeSignals
 import ro.zapakid.app.testing.FakeAppleBrowser
 import ro.zapakid.app.testing.FakeAuthApi
 import ro.zapakid.app.testing.FakeIdTokenProvider
 import ro.zapakid.app.testing.InMemorySessionStore
-import ro.zapakid.app.keys.DeviceRegistrar
-import ro.zapakid.app.keys.DeviceRegistration
 import ro.zapakid.app.ui.AuthViewModel
 import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp

@@ -150,7 +150,7 @@ fun AgreementScreen(onContinue: () -> Unit) {
 }
 
 @Composable
-fun HomeScreen(parent: Parent, onSignOut: () -> Unit) {
+fun HomeScreen(parent: Parent, device: DeviceSetupState, onRetryDevice: () -> Unit, onSignOut: () -> Unit) {
     ScreenColumn(tag = "home") {
         Title(stringResource(R.string.app_name))
         val who = parent.displayName ?: parent.email
@@ -159,6 +159,7 @@ fun HomeScreen(parent: Parent, onSignOut: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
+        DeviceSetupStatus(device, onRetryDevice)
         val signOut = stringResource(R.string.sign_out)
         OutlinedButton(
             onClick = onSignOut,

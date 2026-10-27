@@ -10,14 +10,12 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import ro.zapakid.app.keys.DeviceRegistration
 import ro.zapakid.app.keys.DeviceRegistrar
+import ro.zapakid.app.keys.DeviceRegistration
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceSetupViewModelTest {
-    private class FakeRegistrar(
-        val results: ArrayDeque<DeviceRegistration.Result>,
-    ) : DeviceRegistrar {
+    private class FakeRegistrar(val results: ArrayDeque<DeviceRegistration.Result>) : DeviceRegistrar {
         var calls = 0
 
         override suspend fun register(): DeviceRegistration.Result {
@@ -68,10 +66,10 @@ class DeviceSetupViewModelTest {
                     ArrayDeque(
                         listOf(
                             DeviceRegistration.Result.Failed(DeviceRegistration.Error.NETWORK),
-                            DeviceRegistration.Result.Registered(2),
-                        ),
-                    ),
-                ),
+                            DeviceRegistration.Result.Registered(2)
+                        )
+                    )
+                )
             )
         vm.start()
         assertEquals(DeviceSetupState.Failed, vm.state.value)

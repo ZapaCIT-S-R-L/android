@@ -1,5 +1,7 @@
 package ro.zapakid.app.keys
 
+import java.io.IOException
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,24 +16,16 @@ import ro.zapakid.app.testing.FAR_FUTURE
 import ro.zapakid.app.testing.FakeBlockStore
 import ro.zapakid.app.testing.RecordingReshare
 import ro.zapakid.app.testing.TestBlobCipher
-import java.io.IOException
-import java.util.Base64
 
 /** Registering this phone: resolve the account identity, make the keys once, upload them, remember the device ID. */
 class DeviceRegistrationTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private class FakeDeviceApi(
-        var hasIdentity: Boolean = false,
-        var fail: Exception? = null,
-    ) : DeviceApi {
+    private class FakeDeviceApi(var hasIdentity: Boolean = false, var fail: Exception? = null) : DeviceApi {
         val uploads = mutableListOf<Pair<String, DeviceKeys>>()
 
-        override suspend fun register(
-            token: String,
-            keys: DeviceKeys,
-        ): Int {
+        override suspend fun register(token: String, keys: DeviceKeys): Int {
             fail?.let {
                 fail = null
                 throw it
@@ -40,10 +34,7 @@ class DeviceRegistrationTest {
             return 2
         }
 
-        override suspend fun accountHasIdentity(
-            token: String,
-            accountId: String,
-        ): Boolean = hasIdentity
+        override suspend fun accountHasIdentity(token: String, accountId: String): Boolean = hasIdentity
     }
 
     private val blockStore = FakeBlockStore()
@@ -52,15 +43,14 @@ class DeviceRegistrationTest {
     private var session: Session? = Session("zks_tok", FAR_FUTURE, ANA)
     private val cipher = TestBlobCipher()
 
-    private fun registration(dir: String = "phone") =
-        DeviceRegistration(
-            records = EncryptedRecordStore(folder.root.resolve(dir), cipher),
-            backup = BlockStoreIdentityBackup(blockStore),
-            api = api,
-            session = { session },
-            reshare = reshare,
-            oneTimeKeys = 3,
-        )
+    private fun registration(dir: String = "phone") = DeviceRegistration(
+        records = EncryptedRecordStore(folder.root.resolve(dir), cipher),
+        backup = BlockStoreIdentityBackup(blockStore),
+        api = api,
+        session = { session },
+        reshare = reshare,
+        oneTimeKeys = 3
+    )
 
     @Test
     fun aNewAccountRegistersOnceWithKeysSignedByItsIdentity() = runTest {
@@ -69,7 +59,12 @@ class DeviceRegistrationTest {
         val (token, keys) = api.uploads.single()
         assertEquals("zks_tok", token)
         val identity = IdentityKey(Base64.getDecoder().decode(keys.identityKey)).publicKey
-        assertTrue(identity.verifySignature(Base64.getDecoder().decode(keys.signedPreKey.publicKey), Base64.getDecoder().decode(keys.signedPreKey.signature)))
+        assertTrue(
+            identity.verifySignature(
+                Base64.getDecoder().decode(keys.signedPreKey.publicKey),
+                Base64.getDecoder().decode(keys.signedPreKey.signature)
+            )
+        )
         assertEquals(3, keys.preKeys.size)
 
         assertEquals("remembered: no second upload", DeviceRegistration.Result.Registered(2), registration().register())
@@ -113,7 +108,10 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.Failed(DeviceRegistration.Error.SIGNED_OUT), registration().register())
 
         api.fail = AuthApiException(409, "identity_mismatch", "x")
-        assertEquals(DeviceRegistration.Result.Failed(DeviceRegistration.Error.IDENTITY_MISMATCH), registration().register())
+        assertEquals(
+            DeviceRegistration.Result.Failed(DeviceRegistration.Error.IDENTITY_MISMATCH),
+            registration().register()
+        )
 
         api.fail = AuthApiException(429, "rate_limited", "x", retryAfterSeconds = 60)
         assertEquals(DeviceRegistration.Result.Failed(DeviceRegistration.Error.SERVER), registration().register())

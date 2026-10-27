@@ -1,0 +1,63 @@
+package ro.zapakid.app.keys
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import okhttp3.HttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import ro.zapakid.app.auth.AuthApiException
+import ro.zapakid.app.auth.readOrThrow
+
+/**
+ * The key directory (openapi.yaml, "Draft: Devices and keys"):
+ *   POST /v1/devices                     DeviceKeys -> 201 {deviceId}
+ *   GET  /v1/accounts/{id}/identity      200 {identityKey, changes} or 404 (no identity yet)
+ */
+interface DeviceApi {
+    /** @return the libsignal device ID (1..127) the server gave this phone. */
+    suspend fun register(token: String, keys: DeviceKeys): Int
+
+    suspend fun accountHasIdentity(token: String, accountId: String): Boolean
+}
+
+class HttpDeviceApi(private val baseUrl: HttpUrl, private val client: OkHttpClient) : DeviceApi {
+    @Serializable
+    private class Registered(val deviceId: Int)
+
+    private val json = DeviceKeys.json
+    private val jsonType = "application/json; charset=utf-8".toMediaType()
+
+    override suspend fun register(token: String, keys: DeviceKeys): Int {
+        val body = json.encodeToString(DeviceKeys.serializer(), keys).toRequestBody(jsonType)
+        val text = execute(request("devices", token).post(body).build())
+        val deviceId = json.decodeFromString(Registered.serializer(), text).deviceId
+        if (deviceId !in DEVICE_IDS) throw AuthApiException(HTTP_BAD_GATEWAY, "invalid_response", "Device ID $deviceId")
+        return deviceId
+    }
+
+    override suspend fun accountHasIdentity(token: String, accountId: String): Boolean = try {
+        execute(request("accounts/$accountId/identity", token).get().build())
+        true
+    } catch (e: AuthApiException) {
+        if (e.status != HTTP_NOT_FOUND) throw e
+        false
+    }
+
+    private fun request(path: String, token: String) = Request
+        .Builder()
+        .url(baseUrl.newBuilder().addPathSegments(path).build())
+        .header("Authorization", "Bearer $token")
+        .header("Accept", "application/json")
+
+    private suspend fun execute(request: Request): String =
+        withContext(Dispatchers.IO) { client.newCall(request).execute().use { it.readOrThrow(json) } }
+
+    private companion object {
+        val DEVICE_IDS = 1..127
+        const val HTTP_NOT_FOUND = 404
+        const val HTTP_BAD_GATEWAY = 502
+    }
+}
