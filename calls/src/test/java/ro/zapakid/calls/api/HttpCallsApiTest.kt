@@ -54,7 +54,10 @@ class HttpCallsApiTest {
         val call = api.create("conv-9")
 
         assertEquals("call-1", call.callId)
-        assertEquals(listOf("stun:stun.cloudflare.com:3478", "turn:turn.cloudflare.com:3478?transport=udp"), call.iceServers.single().urls)
+        assertEquals(
+            listOf("stun:stun.cloudflare.com:3478", "turn:turn.cloudflare.com:3478?transport=udp"),
+            call.iceServers.single().urls
+        )
         assertEquals("u1", call.iceServers.single().username)
         val request = server.takeRequest()
         assertEquals("POST", request.method)
@@ -90,7 +93,10 @@ class HttpCallsApiTest {
     @Test
     fun aConversationTheTokenDoesNotAllowIsAClearError() = runTest {
         server.enqueue(
-            MockResponse(code = 403, body = """{"error":{"code":"conversation_not_allowed","message":"Not a member"}}""")
+            MockResponse(
+                code = 403,
+                body = """{"error":{"code":"conversation_not_allowed","message":"Not a member"}}"""
+            )
         )
 
         val e = expectError { api.create("conv-x") }
@@ -113,7 +119,9 @@ class HttpCallsApiTest {
 
     @Test
     fun aSecond401IsReturnedNotLooped() = runTest {
-        repeat(2) { server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"bad_token","message":"x"}}""")) }
+        repeat(2) {
+            server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"bad_token","message":"x"}}"""))
+        }
 
         assertEquals(401, expectError { api.leave("call-1") }.status)
         assertEquals(2, server.requestCount)
@@ -188,7 +196,9 @@ class HttpCallsApiTest {
             api.newTracks(
                 "call-1",
                 "sess-1",
-                TracksRequest(tracks = listOf(TrackRef(location = "remote", trackName = "mic-dev-b", sessionId = "sess-b")))
+                TracksRequest(
+                    tracks = listOf(TrackRef(location = "remote", trackName = "mic-dev-b", sessionId = "sess-b"))
+                )
             )
         api.renegotiate("call-1", "sess-1", SessionDescription("answer", "v=0 my answer"))
         api.closeTracks("call-1", "sess-1", listOf("1"), SessionDescription("offer", "v=0 close"))
@@ -209,7 +219,11 @@ class HttpCallsApiTest {
     @Test
     fun theBaseUrlMustBeHttpsOutsideLoopback() {
         try {
-            HttpCallsApi(okhttp3.HttpUrl.Builder().scheme("http").host("calls.zapakid.ro").addPathSegment("v1").build(), OkHttpClient(), tokens)
+            HttpCallsApi(
+                okhttp3.HttpUrl.Builder().scheme("http").host("calls.zapakid.ro").addPathSegment("v1").build(),
+                OkHttpClient(),
+                tokens
+            )
             fail("plain http accepted")
         } catch (_: IllegalArgumentException) {
         }

@@ -1,5 +1,12 @@
 package ro.zapakid.calls.api
 
+import java.util.Base64
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -23,9 +30,6 @@ import org.junit.Before
 import org.junit.Test
 import ro.zapakid.calls.crypto.CallDevice
 import ro.zapakid.calls.crypto.KeyEnvelope
-import java.util.Base64
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
 /** The per-call event socket: roster, track names, key envelopes, joined/left/ended and the ring timeout. */
 class CallEventsClientTest {
@@ -54,6 +58,10 @@ class CallEventsClientTest {
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             received.put(text)
                         }
+
+                        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                            webSocket.close(1000, null)
+                        }
                     }
                 ).build()
         )
@@ -62,12 +70,13 @@ class CallEventsClientTest {
     @After
     fun tearDown() = server.close()
 
-    private fun client() = CallEventsClient(baseUrl = server.url("/v1/"), client = OkHttpClient(), tokens = FakeChatTokens())
+    private fun client() =
+        CallEventsClient(baseUrl = server.url("/v1/"), client = OkHttpClient(), tokens = FakeChatTokens())
 
     @Test
     fun parsesRosterKeysAndCallEvents() = runBlocking {
         val connection = client().connect("call-1")
-        val events = async(connection, 5)
+        val events = firstSignals(connection, 5)
         assertTrue(opened.await(5, TimeUnit.SECONDS))
         val blob = Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3))
         serverSocket.send(
@@ -128,7 +137,7 @@ class CallEventsClientTest {
     @Test
     fun unknownOrBrokenMessagesAreSkippedNotFatal() = runBlocking {
         val connection = client().connect("call-1")
-        val next = async(connection, 1)
+        val next = firstSignals(connection, 1)
         assertTrue(opened.await(5, TimeUnit.SECONDS))
         serverSocket.send("""{"type":"video_hint"}""")
         serverSocket.send("not json")
@@ -148,8 +157,6 @@ class CallEventsClientTest {
         assertEquals(CallSignal.Disconnected(1001), last)
     }
 
-    private fun async(connection: CallEventsConnection, n: Int) =
-        kotlinx.coroutines.GlobalScope.async(kotlinx.coroutines.Dispatchers.IO) {
-            withTimeout(5_000) { connection.signals.take(n).toList() }
-        }
+    private fun CoroutineScope.firstSignals(connection: CallEventsConnection, n: Int): Deferred<List<CallSignal>> =
+        async(Dispatchers.IO) { withTimeout(5_000) { connection.signals.take(n).toList() } }
 }
