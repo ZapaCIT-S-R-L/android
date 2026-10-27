@@ -63,7 +63,9 @@ class FakeCallsApi(var callId: String = "call-1") : CallsApi {
 }
 
 /** The calls service's event socket, driven by the test. */
-class FakeEvents : CallEventsSource, CallEventsConnection {
+class FakeEvents :
+    CallEventsSource,
+    CallEventsConnection {
     private val channel = Channel<CallSignal>(Channel.UNLIMITED)
     override val signals: Flow<CallSignal> = channel.receiveAsFlow()
     val sentKeys = mutableListOf<KeyEnvelope>()
@@ -91,8 +93,10 @@ class FakeCallEngine : CallEngine {
     override val events: Flow<EngineEvent> = flow
     var started = false
     var stopped = false
-    var muted = false
-    var speaker = false
+    var isMuted = false
+        private set
+    var speakerOn = false
+        private set
     val rotations = mutableListOf<Int>()
     var participants: List<Participant> = emptyList()
     var ring: KeyRing? = null
@@ -111,11 +115,11 @@ class FakeCallEngine : CallEngine {
     }
 
     override fun setMuted(muted: Boolean) {
-        this.muted = muted
+        isMuted = muted
     }
 
     override fun setSpeaker(on: Boolean) {
-        speaker = on
+        speakerOn = on
     }
 
     override suspend fun stop() {
@@ -129,11 +133,18 @@ class FakeCallEngine : CallEngine {
 
 /** Same rules as the libsignal sealer: bound to sender and recipient. Not encryption; tests only. */
 class TestSealer(private val self: CallDevice) : CallKeySealer {
-    override suspend fun seal(payload: ByteArray, toDevice: CallDevice) = "${toDevice.device}|${self.device}|".encodeToByteArray() + payload
+    override suspend fun seal(payload: ByteArray, toDevice: CallDevice) =
+        "${toDevice.device}|${self.device}|".encodeToByteArray() + payload
 
     override suspend fun open(blob: ByteArray, fromDevice: CallDevice): ByteArray {
         val header = "${self.device}|${fromDevice.device}|".encodeToByteArray()
-        if (!blob.copyOfRange(0, minOf(header.size, blob.size)).contentEquals(header)) throw CallKeySealerException("wrong device")
+        if (!blob.copyOfRange(
+                0,
+                minOf(header.size, blob.size)
+            ).contentEquals(header)
+        ) {
+            throw CallKeySealerException("wrong device")
+        }
         return blob.copyOfRange(header.size, blob.size)
     }
 }

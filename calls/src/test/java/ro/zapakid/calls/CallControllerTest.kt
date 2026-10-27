@@ -31,7 +31,9 @@ class CallControllerTest {
     private val log = InMemoryCallLog()
 
     private fun TestScope.controller() =
-        CallController(api, events, engine, TestSealer(ME), ME, log, backgroundScope, clock = { testScheduler.currentTime })
+        CallController(api, events, engine, TestSealer(ME), ME, log, backgroundScope, clock = {
+            testScheduler.currentTime
+        })
 
     /** Ana's phone as the key leader: seals her key to me. */
     private suspend fun anaSendsKey(vararg roster: ro.zapakid.calls.crypto.CallDevice) {
@@ -218,8 +220,8 @@ class CallControllerTest {
         engine.emit(EngineEvent.Speaking(setOf(ION, ME)))
         runCurrent()
 
-        assertTrue(engine.muted)
-        assertTrue(engine.speaker)
+        assertTrue(engine.isMuted)
+        assertTrue(engine.speakerOn)
         assertTrue(calls.state.value.muted)
         assertEquals(listOf(false, true), calls.state.value.people.map { it.speaking })
         assertFalse("muted: my own ring stays off", calls.state.value.selfSpeaking)
