@@ -27,6 +27,7 @@ import ro.zapakid.app.family.KidPairingViewModel
 @Composable
 fun ZapaKidApp(
     viewModel: AuthViewModel,
+    deviceSetup: DeviceSetupViewModel,
     google: IdTokenProvider,
     apple: AppleBrowser,
     family: FamilyViewModel? = null,
@@ -58,9 +59,12 @@ fun ZapaKidApp(
 
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
 
-        is AuthUiState.SignedIn ->
+        is AuthUiState.SignedIn -> {
+            LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
+            val device by deviceSetup.state.collectAsStateWithLifecycle()
             when {
-                family == null -> HomeScreen(parent = s.parent, onSignOut = viewModel::logout)
+                family == null ->
+                    HomeScreen(parent = s.parent, device = device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
 
                 shell == null -> FamilyRoute(family, onSignOut = viewModel::logout)
 
@@ -68,6 +72,7 @@ fun ZapaKidApp(
                     FamilyRoute(family, onSignOut = viewModel::logout)
                 }
             }
+        }
 
         AuthUiState.Blocked -> BlockedScreen(onBack = viewModel::backToSignIn)
 

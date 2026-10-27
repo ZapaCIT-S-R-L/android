@@ -1,10 +1,6 @@
 package ro.zapakid.app.auth
 
 import java.io.File
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,8 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import ro.zapakid.app.testing.TestBlobCipher
 
-/** The session is stored only encrypted; the real cipher is Android Keystore (see KeystoreSessionCipherTest). */
+/** The session is stored only encrypted; the real cipher is Android Keystore (see KeystoreBlobCipherTest). */
 class EncryptedSessionStoreTest {
     @get:Rule
     val folder = TemporaryFolder()
@@ -23,7 +20,7 @@ class EncryptedSessionStoreTest {
 
     @Test
     fun savedSessionLoadsBack() {
-        val store = EncryptedSessionStore(File(folder.root, "session.bin"), SoftwareTestCipher())
+        val store = EncryptedSessionStore(File(folder.root, "session.bin"), TestBlobCipher())
 
         store.save(session)
 
@@ -33,7 +30,7 @@ class EncryptedSessionStoreTest {
     @Test
     fun theFileNeverContainsTheTokenOrProfileInPlainText() {
         val file = File(folder.root, "session.bin")
-        EncryptedSessionStore(file, SoftwareTestCipher()).save(session)
+        EncryptedSessionStore(file, TestBlobCipher()).save(session)
 
         val raw = file.readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(raw.contains("secret-session-token"))
@@ -45,7 +42,7 @@ class EncryptedSessionStoreTest {
     @Test
     fun clearDeletesTheFile() {
         val file = File(folder.root, "session.bin")
-        val store = EncryptedSessionStore(file, SoftwareTestCipher())
+        val store = EncryptedSessionStore(file, TestBlobCipher())
         store.save(session)
 
         store.clear()
@@ -56,13 +53,13 @@ class EncryptedSessionStoreTest {
 
     @Test
     fun noFileMeansNoSession() {
-        assertNull(EncryptedSessionStore(File(folder.root, "none.bin"), SoftwareTestCipher()).load())
+        assertNull(EncryptedSessionStore(File(folder.root, "none.bin"), TestBlobCipher()).load())
     }
 
     @Test
     fun aTamperedFileIsDiscardedNotTrusted() {
         val file = File(folder.root, "session.bin")
-        val store = EncryptedSessionStore(file, SoftwareTestCipher())
+        val store = EncryptedSessionStore(file, TestBlobCipher())
         store.save(session)
         val bytes = file.readBytes()
         bytes[bytes.size - 1] = (bytes[bytes.size - 1].toInt() xor 1).toByte()
@@ -75,26 +72,9 @@ class EncryptedSessionStoreTest {
     @Test
     fun aFileFromAnotherKeyIsDiscarded() {
         val file = File(folder.root, "session.bin")
-        EncryptedSessionStore(file, SoftwareTestCipher()).save(session)
+        EncryptedSessionStore(file, TestBlobCipher()).save(session)
 
-        assertNull(EncryptedSessionStore(file, SoftwareTestCipher()).load())
+        assertNull(EncryptedSessionStore(file, TestBlobCipher()).load())
         assertTrue(!file.exists())
-    }
-}
-
-/** AES-GCM with an in-memory key, standing in for the Keystore key on the JVM. Test-only. */
-private class SoftwareTestCipher : SessionCipher {
-    private val key: SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-
-    override fun encrypt(plaintext: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key)
-        return cipher.iv + cipher.doFinal(plaintext)
-    }
-
-    override fun decrypt(ciphertext: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, ciphertext, 0, 12))
-        return cipher.doFinal(ciphertext, 12, ciphertext.size - 12)
     }
 }

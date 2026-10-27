@@ -14,6 +14,7 @@ import ro.zapakid.app.family.FamilyViewModel
 import ro.zapakid.app.family.GmsQrScanner
 import ro.zapakid.app.family.KidPairingViewModel
 import ro.zapakid.app.ui.AuthViewModel
+import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp
 import ro.zapakid.app.ui.theme.ZapaKidTheme
 
@@ -34,6 +35,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val deviceSetup: DeviceSetupViewModel by viewModels {
+        viewModelFactory { initializer { DeviceSetupViewModel(graph.deviceRegistration) } }
+    }
+
     private val google by lazy { GoogleIdTokenProvider({ this }, BuildConfig.GOOGLE_SERVER_CLIENT_ID) }
     private val apple by lazy { CustomTabAppleBrowser(activity = { this }, openCustomTab = graph.openCustomTab) }
 
@@ -44,6 +49,7 @@ class MainActivity : ComponentActivity() {
             ZapaKidTheme {
                 ZapaKidApp(
                     authViewModel,
+                    deviceSetup,
                     google = google,
                     apple = apple,
                     family = familyViewModel,

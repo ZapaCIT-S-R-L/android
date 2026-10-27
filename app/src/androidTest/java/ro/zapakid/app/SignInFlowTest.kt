@@ -23,6 +23,8 @@ import ro.zapakid.app.auth.AgeRange
 import ro.zapakid.app.auth.AuthApiException
 import ro.zapakid.app.auth.AuthRepository
 import ro.zapakid.app.auth.Provider
+import ro.zapakid.app.keys.DeviceRegistrar
+import ro.zapakid.app.keys.DeviceRegistration
 import ro.zapakid.app.testing.APPLE_CONFIG
 import ro.zapakid.app.testing.FakeAgeSignals
 import ro.zapakid.app.testing.FakeAppleBrowser
@@ -30,6 +32,7 @@ import ro.zapakid.app.testing.FakeAuthApi
 import ro.zapakid.app.testing.FakeIdTokenProvider
 import ro.zapakid.app.testing.InMemorySessionStore
 import ro.zapakid.app.ui.AuthViewModel
+import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp
 import ro.zapakid.app.ui.theme.ZapaKidTheme
 
@@ -45,13 +48,25 @@ class SignInFlowTest {
     private val google = FakeIdTokenProvider()
     private val apple = FakeAppleBrowser()
 
+    /** Stands in for device registration: answers [deviceResults] in order. */
+    private val deviceResults = ArrayDeque(listOf<DeviceRegistration.Result>(DeviceRegistration.Result.Registered(2)))
+    private val registrar = DeviceRegistrar { deviceResults.removeFirst() }
+
     private fun launch(fontScale: Float = 1f) {
         val viewModel = AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG))
+        val deviceSetup = DeviceSetupViewModel(registrar)
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
-                ZapaKidTheme { ZapaKidApp(viewModel, google = google, apple = apple) }
+                ZapaKidTheme { ZapaKidApp(viewModel, deviceSetup, google = google, apple = apple) }
             }
         }
+    }
+
+    private fun signInWithGoogle() {
+        compose.onNodeWithContentDescription("Sign in with Google").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Continue").performClick()
+        compose.waitForIdle()
     }
 
     @Test
@@ -162,5 +177,36 @@ class SignInFlowTest {
         compose.onNodeWithText("Back").assertHeightIsAtLeast(48.dp).performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Sign in with Google").assertIsDisplayed()
+    }
+
+    @Test
+    fun afterSignInThePhoneSetsUpEncryption() {
+        launch()
+        signInWithGoogle()
+
+        compose.onNodeWithText("End-to-end encryption is set up on this phone.").assertIsDisplayed()
+    }
+
+    @Test
+    fun aPhoneWaitingForItsKeysSaysSo() {
+        deviceResults.clear()
+        deviceResults += DeviceRegistration.Result.WaitingForReshare
+        launch()
+        signInWithGoogle()
+
+        compose.onNodeWithText("Waiting for your other phone", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun aFailedSetupOffersRetry() {
+        deviceResults.clear()
+        deviceResults += DeviceRegistration.Result.Failed(DeviceRegistration.Error.NETWORK)
+        deviceResults += DeviceRegistration.Result.Registered(2)
+        launch()
+        signInWithGoogle()
+
+        compose.onNodeWithText("Try again").assertHeightIsAtLeast(48.dp).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("End-to-end encryption is set up on this phone.").assertIsDisplayed()
     }
 }

@@ -49,18 +49,8 @@ class HttpAuthApi(
     private suspend fun post(path: String, body: String, attest: Boolean = false): String {
         val bytes = body.encodeToByteArray()
         val request = Request.Builder().url(endpoint(path)).post(bytes.toRequestBody(jsonType))
-        if (attest) attestationToken(bytes)?.let { request.header(Attestation.HEADER, it) }
+        if (attest) attestation.tokenFor(bytes)?.let { request.header(Attestation.HEADER, it) }
         return execute(request.build())
-    }
-
-    /** Never fails the request: without a token the server applies its policy (403 attestation_failed). */
-    @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private suspend fun attestationToken(body: ByteArray): String? = try {
-        attestation?.token(Attestation.requestHash(body))
-    } catch (e: kotlinx.coroutines.CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
     }
 
     private fun session(text: String): Session {
@@ -99,19 +89,22 @@ class HttpAuthApi(
             .use { response -> readOrThrow(response) }
     }
 
-    private fun readOrThrow(response: Response): String {
-        val text = response.body.string()
-        if (response.isSuccessful) return text
-        val error = runCatching { json.decodeFromString(ErrorBody.serializer(), text) }.getOrNull()
-        throw AuthApiException(
-            status = response.code,
-            code = error?.error?.code ?: "http_${response.code}",
-            message = error?.error?.message ?: "Server error ${response.code}",
-            retryAfterSeconds = response.header("Retry-After")?.trim()?.toLongOrNull()
-        )
-    }
+    private fun readOrThrow(response: Response): String = response.readOrThrow(json)
 
     private companion object {
         val EMPTY = ByteArray(0).toRequestBody(null)
     }
+}
+
+/** The body of a 2xx answer, or the API's error as [AuthApiException] ({"error": {"code", "message"}}). */
+internal fun Response.readOrThrow(json: Json): String {
+    val text = body.string()
+    if (isSuccessful) return text
+    val error = runCatching { json.decodeFromString(ErrorBody.serializer(), text) }.getOrNull()
+    throw AuthApiException(
+        status = code,
+        code = error?.error?.code ?: "http_$code",
+        message = error?.error?.message ?: "Server error $code",
+        retryAfterSeconds = header("Retry-After")?.trim()?.toLongOrNull()
+    )
 }
