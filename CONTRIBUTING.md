@@ -34,6 +34,16 @@ pull requests.
 Never commit a refreshed file you haven't reviewed, and never turn verification off (`--dependency-verification
 lenient` / `off`) in CI.
 
+**libsignal** comes only from Signal's Maven repository (`settings.gradle.kts`, exclusive to `org.signal`). To bump
+it: change `libsignal` in `gradle/libs.versions.toml` to the new release tag of
+[signalapp/libsignal](https://github.com/signalapp/libsignal/releases), refresh the verification metadata, and run
+`./scripts/ci-local.sh`; CI also scans libsignal's Rust `Cargo.lock` at that tag with OSV-Scanner.
+
+## Before every push
+
+`./scripts/ci-local.sh` runs the CI checks on your machine (JDK 21, Node 24, osv-scanner, gitleaks, actionlint):
+build, unit tests, lint, OSV, gitleaks, and the emulator tests when an emulator is attached. Push only when it passes.
+
 ## Contributor License Agreement
 
 This project is licensed under the [AGPL-3.0](LICENSE). Before we can merge your first pull request, you sign the

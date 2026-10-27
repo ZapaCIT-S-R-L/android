@@ -9,6 +9,12 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // libsignal is published only to Signal's own repository. Exclusive: org.signal comes from nowhere else,
+        // and that repository serves nothing else.
+        exclusiveContent {
+            forRepository { maven("https://build-artifacts.signal.org/libraries/maven/") }
+            filter { includeGroup("org.signal") }
+        }
         google()
         mavenCentral()
     }

@@ -4,7 +4,8 @@
 #   ui       Compose UI and instrumented tests on an Android emulator (KVM): ./gradlew connectedDebugAndroidTest
 #   lint     Android lint, ktlint, detekt, actionlint (workflows)
 #   scripts  repository scripts: CLA check and release version (npm test)
-#   deps     OSV-Scanner over gradle/verification-metadata.xml; fails on high or critical vulnerabilities
+#   deps     OSV-Scanner over gradle/verification-metadata.xml (fails on high, critical or unrated) and over
+#            libsignal's Rust Cargo.lock at the pinned tag (fails on high or critical; unrated notices listed)
 #   secrets  gitleaks scan of the whole history
 #   cla      the PR author signed the CLA (CLA-SIGNATURES.md), or is ZapaCIT staff or a bot
 name: ci
@@ -35,7 +36,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - run: ./gradlew assembleDebug assembleRelease
 
@@ -48,7 +49,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - run: ./gradlew testDebugUnitTest
       - if: failure()
@@ -66,7 +67,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Enable KVM for the emulator
         run: |
@@ -97,7 +98,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - run: ./gradlew lintDebug ktlintCheck detekt --continue
       - run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
@@ -133,6 +134,18 @@ jobs:
             ./
       - name: Fail on high or critical vulnerabilities (CVSS 7.0 or more)
         run: node scripts/osv-gate.js osv-results.json
+      # libsignal's native library has no lock file in the AAR: scan the Rust crates at the pinned tag instead.
+      - run: ./scripts/fetch-libsignal-cargo-lock.sh
+      - name: Scan libsignal's Rust crates with OSV-Scanner
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --output=osv-libsignal.json
+            --lockfile=build/libsignal/Cargo.lock
+      - name: Fail on high or critical vulnerabilities in libsignal (unrated notices are listed)
+        run: node scripts/osv-gate.js osv-libsignal.json --unrated=warn
 
   secrets:
     if: github.event_name != 'schedule'
