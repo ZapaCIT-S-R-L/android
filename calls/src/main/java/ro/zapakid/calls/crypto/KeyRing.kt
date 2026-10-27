@@ -17,7 +17,7 @@ class KeyRing {
         val slot = indexOf(key.epoch)
         slots[slot]?.takeIf { it !== key }?.wipe()
         slots[slot] = key
-        if ((current?.epoch ?: 0) < key.epoch) current = key
+        if (current.let { it == null || it.epoch < key.epoch }) current = key
     }
 
     /** The key for an epoch, or null when the ring never had it or it has rotated out. */
