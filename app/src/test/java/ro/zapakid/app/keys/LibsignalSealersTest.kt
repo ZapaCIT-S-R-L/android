@@ -31,10 +31,12 @@ class LibsignalSealersTest {
         fun bundle(): PreKeyBundle {
             val identity = store.identityKeyPair
             val signed = ECKeyPair.generate()
-            val signedRecord = SignedPreKeyRecord(1, 0, signed, identity.privateKey.calculateSignature(signed.publicKey.serialize()))
+            val signedRecord =
+                SignedPreKeyRecord(1, 0, signed, identity.privateKey.calculateSignature(signed.publicKey.serialize()))
             store.storeSignedPreKey(1, signedRecord)
             val kyber = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
-            val kyberRecord = KyberPreKeyRecord(2, 0, kyber, identity.privateKey.calculateSignature(kyber.publicKey.serialize()))
+            val kyberRecord =
+                KyberPreKeyRecord(2, 0, kyber, identity.privateKey.calculateSignature(kyber.publicKey.serialize()))
             store.storeKyberPreKey(2, kyberRecord)
             val one = ECKeyPair.generate()
             store.storePreKey(3, PreKeyRecord(3, one))
@@ -57,7 +59,8 @@ class LibsignalSealersTest {
     private val ana = Phone("ana", 1)
     private val ion = Phone("ion", 2)
     private val phones = listOf(ana, ion)
-    private val directory = PreKeyBundleSource { account -> phones.filter { it.account == account }.map { it.bundle() } }
+    private val directory =
+        PreKeyBundleSource { account -> phones.filter { it.account == account }.map { it.bundle() } }
 
     private fun sessions(phone: Phone) = LibsignalSessions(phone.store, phone.address, directory)
 
@@ -85,7 +88,9 @@ class LibsignalSealersTest {
             kotlinx.coroutines.runBlocking { ionSealer.open(sealed.type, tampered, ChatDevice("ana", 1)) }
         }
         assertThrows(MessageSealerException::class.java) {
-            kotlinx.coroutines.runBlocking { ionSealer.open(CiphertextType.SenderKey, sealed.content, ChatDevice("ana", 1)) }
+            kotlinx.coroutines.runBlocking {
+                ionSealer.open(CiphertextType.SenderKey, sealed.content, ChatDevice("ana", 1))
+            }
         }
     }
 
@@ -108,7 +113,9 @@ class LibsignalSealersTest {
     @Test
     fun aDeviceWithoutABundleCannotBeSealedFor() = runTest {
         assertThrows(MessageSealerException::class.java) {
-            kotlinx.coroutines.runBlocking { LibsignalMessageSealer(sessions(ana)).seal(byteArrayOf(1), ChatDevice("nobody", 1)) }
+            kotlinx.coroutines.runBlocking {
+                LibsignalMessageSealer(sessions(ana)).seal(byteArrayOf(1), ChatDevice("nobody", 1))
+            }
         }
     }
 }

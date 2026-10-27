@@ -118,8 +118,17 @@ class AppGraph(
             chatUrl = BuildConfig.CHAT_BASE_URL.toHttpUrl(),
             callsUrl = BuildConfig.CALLS_BASE_URL.toHttpUrl(),
             tokens = chatTokens,
-            // The libsignal sealers are wired here once the key-setup PRs land (android #12, #17).
-            sealers = ro.zapakid.app.shell.SealerSource.None,
+            sealers =
+                ro.zapakid.app.keys.LibsignalSealerSource(
+                    deviceRegistration,
+                    accountKeys,
+                    authRepository::currentSession,
+                    ro.zapakid.app.keys.HttpPreKeyBundles(
+                        BuildConfig.API_BASE_URL.toHttpUrl(),
+                        http,
+                        authRepository::token
+                    )
+                ),
             store = {
                 ro.zapakid.chat.data.SqlCipherChatStore(
                     app,
