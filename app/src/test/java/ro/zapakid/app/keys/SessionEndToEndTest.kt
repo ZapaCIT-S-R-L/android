@@ -35,7 +35,11 @@ class SessionEndToEndTest {
 
     private fun startSession(alice: Phone, bob: Phone): DeviceKeys {
         val bobKeys = DeviceKeyGenerator(bob.identity, bob.store).generate(oneTimeCount = 3)
-        SessionBuilder(alice.store, aliceAddress, bobAddress).process(PreKeyBundles.from(bobKeys.identityKey, bobKeys.asBundle()))
+        SessionBuilder(
+            alice.store,
+            bobAddress,
+            aliceAddress
+        ).process(PreKeyBundles.from(bobKeys.identityKey, bobKeys.asBundle()))
         return bobKeys
     }
 
@@ -51,11 +55,21 @@ class SessionEndToEndTest {
         assertEquals("Hi Bob", bobCipher.decrypt(PreKeySignalMessage(first.serialize())).decodeToString())
 
         val reply = SessionCipher(bob.reopen().store, bobAddress, aliceAddress).encrypt("Hi Alice".encodeToByteArray())
-        assertEquals("Hi Alice", SessionCipher(alice.store, aliceAddress, bobAddress).decrypt(SignalMessage(reply.serialize())).decodeToString())
+        assertEquals(
+            "Hi Alice",
+            SessionCipher(
+                alice.store,
+                aliceAddress,
+                bobAddress
+            ).decrypt(SignalMessage(reply.serialize())).decodeToString()
+        )
 
         val bobStore = bob.reopen().store
         assertFalse("the one-time EC prekey is used up", bobStore.containsPreKey(bobKeys.preKeys.first().keyId))
-        assertFalse("the one-time Kyber prekey is used up", bobStore.containsKyberPreKey(bobKeys.pqPreKeys.first().keyId))
+        assertFalse(
+            "the one-time Kyber prekey is used up",
+            bobStore.containsKyberPreKey(bobKeys.pqPreKeys.first().keyId)
+        )
         assertTrue("the last-resort Kyber prekey stays", bobStore.containsKyberPreKey(bobKeys.pqLastResortPreKey.keyId))
         try {
             bobStore.loadPreKey(bobKeys.preKeys.first().keyId)
@@ -77,7 +91,11 @@ class SessionEndToEndTest {
         } catch (expected: ReusedBaseKeyException) {
         }
         // Another base key is fine.
-        bob.store.markKyberPreKeyUsed(keys.pqLastResortPreKey.keyId, keys.signedPreKey.keyId, ECKeyPair.generate().publicKey)
+        bob.store.markKyberPreKeyUsed(
+            keys.pqLastResortPreKey.keyId,
+            keys.signedPreKey.keyId,
+            ECKeyPair.generate().publicKey
+        )
     }
 
     @Test
@@ -102,24 +120,41 @@ class SessionEndToEndTest {
         val newKeys = DeviceKeyGenerator(newBob.identity, newBob.store).generate(oneTimeCount = 1)
         val newBundle = PreKeyBundles.from(newKeys.identityKey, newKeys.asBundle())
         try {
-            SessionBuilder(alice.store, aliceAddress, bobAddress).process(newBundle)
+            SessionBuilder(alice.store, bobAddress, aliceAddress).process(newBundle)
             fail("a changed key was trusted silently")
         } catch (expected: UntrustedIdentityException) {
         }
 
-        assertEquals(IdentityKeyStore.IdentityChange.REPLACED_EXISTING, alice.store.saveIdentity(bobAddress, newBundle.identityKey))
+        assertEquals(
+            IdentityKeyStore.IdentityChange.REPLACED_EXISTING,
+            alice.store.saveIdentity(bobAddress, newBundle.identityKey)
+        )
         assertTrue(alice.store.hasPendingIdentityChange(bobAddress))
-        assertFalse(alice.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.SENDING))
-        assertTrue("receiving still works, so the app can show the warning", alice.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.RECEIVING))
+        assertFalse(
+            alice.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.SENDING)
+        )
+        assertTrue(
+            "receiving still works, so the app can show the warning",
+            alice.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.RECEIVING)
+        )
 
         val restarted = alice.reopen()
         assertTrue("the pending change survives a restart", restarted.store.hasPendingIdentityChange(bobAddress))
-        assertFalse(restarted.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.SENDING))
+        assertFalse(
+            restarted.store.isTrustedIdentity(bobAddress, newBundle.identityKey, IdentityKeyStore.Direction.SENDING)
+        )
 
         restarted.store.acknowledgeIdentityChange(bobAddress)
         assertFalse(restarted.reopen().store.hasPendingIdentityChange(bobAddress))
-        SessionBuilder(restarted.store, aliceAddress, bobAddress).process(newBundle)
+        SessionBuilder(restarted.store, bobAddress, aliceAddress).process(newBundle)
         val message = SessionCipher(restarted.store, aliceAddress, bobAddress).encrypt("Hi again".encodeToByteArray())
-        assertEquals("Hi again", SessionCipher(newBob.store, bobAddress, aliceAddress).decrypt(PreKeySignalMessage(message.serialize())).decodeToString())
+        assertEquals(
+            "Hi again",
+            SessionCipher(
+                newBob.store,
+                bobAddress,
+                aliceAddress
+            ).decrypt(PreKeySignalMessage(message.serialize())).decodeToString()
+        )
     }
 }

@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -15,7 +16,6 @@ import org.signal.libsignal.protocol.IdentityKey
 import org.signal.libsignal.protocol.ecc.ECPublicKey
 import org.signal.libsignal.protocol.kem.KEMPublicKey
 import ro.zapakid.app.testing.Phone
-import java.util.Base64
 
 /** This phone's libsignal keys, published as the openapi.yaml DeviceKeys shape (public keys + signatures only). */
 class DeviceKeyGeneratorTest {
@@ -40,7 +40,9 @@ class DeviceKeyGeneratorTest {
         val keys = DeviceKeyGenerator(phone.identity, phone.store).generate(oneTimeCount = 5)
         val identity = IdentityKey(b64.decode(keys.identityKey)).publicKey
 
-        assertTrue(identity.verifySignature(b64.decode(keys.signedPreKey.publicKey), b64.decode(keys.signedPreKey.signature)))
+        assertTrue(
+            identity.verifySignature(b64.decode(keys.signedPreKey.publicKey), b64.decode(keys.signedPreKey.signature))
+        )
         for (kyber in keys.pqPreKeys + keys.pqLastResortPreKey) {
             assertTrue(identity.verifySignature(b64.decode(kyber.publicKey), b64.decode(kyber.signature)))
             KEMPublicKey(b64.decode(kyber.publicKey)) // parses as a Kyber key
@@ -56,7 +58,11 @@ class DeviceKeyGeneratorTest {
         val keys = DeviceKeyGenerator(phone.identity, phone.store).generate()
         assertEquals(100, keys.preKeys.size)
         assertEquals(100, keys.pqPreKeys.size)
-        assertTrue(runCatching { DeviceKeyGenerator(phone.identity, phone.store).generate(oneTimeCount = 101) }.isFailure)
+        assertTrue(
+            runCatching {
+                DeviceKeyGenerator(phone.identity, phone.store).generate(oneTimeCount = 101)
+            }.isFailure
+        )
     }
 
     @Test
@@ -66,7 +72,15 @@ class DeviceKeyGeneratorTest {
         val ids = keys.preKeys.map { it.keyId } + keys.pqPreKeys.map { it.keyId } + keys.pqLastResortPreKey.keyId
         assertTrue(ids.all { it in 0..0xFFFFFF })
         assertEquals("EC ids unique", 20, keys.preKeys.map { it.keyId }.toSet().size)
-        assertEquals("Kyber ids unique", 21, (keys.pqPreKeys.map { it.keyId } + keys.pqLastResortPreKey.keyId).toSet().size)
+        assertEquals(
+            "Kyber ids unique",
+            21,
+            (
+                keys.pqPreKeys.map {
+                    it.keyId
+                } + keys.pqLastResortPreKey.keyId
+                ).toSet().size
+        )
     }
 
     @Test
@@ -76,7 +90,10 @@ class DeviceKeyGeneratorTest {
         val json = DeviceKeys.json.encodeToString(DeviceKeys.serializer(), keys)
         val body = Json.parseToJsonElement(json).jsonObject
 
-        assertEquals(setOf("registrationId", "identityKey", "signedPreKey", "pqLastResortPreKey", "preKeys", "pqPreKeys"), body.keys)
+        assertEquals(
+            setOf("registrationId", "identityKey", "signedPreKey", "pqLastResortPreKey", "preKeys", "pqPreKeys"),
+            body.keys
+        )
         assertEquals(setOf("keyId", "publicKey", "signature"), (body["signedPreKey"] as JsonObject).keys)
         assertEquals(setOf("keyId", "publicKey", "signature"), (body["pqLastResortPreKey"] as JsonObject).keys)
         assertEquals(setOf("keyId", "publicKey"), body["preKeys"]!!.jsonArray[0].jsonObject.keys)
@@ -97,10 +114,13 @@ class DeviceKeyGeneratorTest {
         val keys = DeviceKeyGenerator(phone.identity, phone.store).generate(oneTimeCount = 3)
         val store = phone.reopen().store
 
-        assertArrayEquals(b64.decode(keys.signedPreKey.publicKey), store.loadSignedPreKey(keys.signedPreKey.keyId).keyPair.publicKey.serialize())
+        assertArrayEquals(
+            b64.decode(keys.signedPreKey.publicKey),
+            store.loadSignedPreKey(keys.signedPreKey.keyId).keyPair.publicKey.serialize()
+        )
         assertArrayEquals(
             b64.decode(keys.pqLastResortPreKey.publicKey),
-            store.loadKyberPreKey(keys.pqLastResortPreKey.keyId).keyPair.publicKey.serialize(),
+            store.loadKyberPreKey(keys.pqLastResortPreKey.keyId).keyPair.publicKey.serialize()
         )
         for (pre in keys.preKeys) {
             assertArrayEquals(b64.decode(pre.publicKey), store.loadPreKey(pre.keyId).keyPair.publicKey.serialize())

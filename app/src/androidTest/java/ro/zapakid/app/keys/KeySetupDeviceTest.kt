@@ -2,6 +2,8 @@ package ro.zapakid.app.keys
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
+import java.security.KeyStore
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,8 +15,6 @@ import org.signal.libsignal.protocol.message.PreKeySignalMessage
 import ro.zapakid.app.auth.KeystoreBlobCipher
 import ro.zapakid.app.testing.address
 import ro.zapakid.app.testing.asBundle
-import java.io.File
-import java.security.KeyStore
 
 /** The same session on a device: libsignal's Android natives, the real Keystore key, files in noBackupFilesDir. */
 @RunWith(AndroidJUnit4::class)
@@ -42,11 +42,22 @@ class KeySetupDeviceTest {
         val (bobIdentity, bob) = open(1)
         val bobKeys = DeviceKeyGenerator(bobIdentity, bob).generate(oneTimeCount = 2)
 
-        SessionBuilder(alice, address("alice"), address("bob")).process(PreKeyBundles.from(bobKeys.identityKey, bobKeys.asBundle()))
+        SessionBuilder(
+            alice,
+            address("bob"),
+            address("alice")
+        ).process(PreKeyBundles.from(bobKeys.identityKey, bobKeys.asBundle()))
         val message = SessionCipher(alice, address("alice"), address("bob")).encrypt("Hi".encodeToByteArray())
 
         val (_, bobAgain) = open(1)
-        assertEquals("Hi", SessionCipher(bobAgain, address("bob"), address("alice")).decrypt(PreKeySignalMessage(message.serialize())).decodeToString())
+        assertEquals(
+            "Hi",
+            SessionCipher(
+                bobAgain,
+                address("bob"),
+                address("alice")
+            ).decrypt(PreKeySignalMessage(message.serialize())).decodeToString()
+        )
         assertTrue(dirs.all { it.canonicalPath.startsWith(context.noBackupFilesDir.canonicalPath) })
     }
 }

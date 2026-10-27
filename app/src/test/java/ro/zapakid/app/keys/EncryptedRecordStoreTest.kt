@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,7 +9,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import ro.zapakid.app.testing.TestBlobCipher
-import java.io.File
 
 /** libsignal's records at rest: one encrypted file per record; names and contents never in plain text. */
 class EncryptedRecordStoreTest {
