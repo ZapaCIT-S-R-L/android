@@ -48,11 +48,12 @@ fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
         val sealers = deps.sealers.sealers() ?: return@produceState
         val me = runCatching { deps.tokens.identity() }.getOrNull() ?: return@produceState
         val chatApi = HttpChatApi(deps.chatUrl, deps.http, deps.tokens)
-        val chats = ChatRepository(chatApi, deps.store(), sealers.chat, ChatDevice(me.account, me.device))
+        val deviceId = me.device.toIntOrNull() ?: return@produceState
+        val chats = ChatRepository(chatApi, deps.store(), sealers.chat, ChatDevice(me.account, deviceId))
         val calls =
             CallController(
                 HttpCallsApi(deps.callsUrl, deps.http, deps.tokens),
-                CallEventsClient(deps.callsUrl, deps.http, deps.tokens)::connect,
+                CallEventsClient(deps.callsUrl, deps.http, deps.tokens, CallDevice(me.account, me.device))::connect,
                 deps.engine(),
                 sealers.calls,
                 CallDevice(me.account, me.device),
@@ -60,7 +61,7 @@ fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
                 scope,
                 CallPeople.Default
             )
-        value = Services(chats, ChatSync(chats, chatApi, chatApi::ack), calls)
+        value = Services(chats, ChatSync(chats, chatApi, chatApi), calls)
     }
     val s = services
     LaunchedEffect(s) { s?.sync?.run() }
