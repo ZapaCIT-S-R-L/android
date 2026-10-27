@@ -38,8 +38,7 @@ class CallControllerTest {
     /** Ana's phone as the key leader: seals her key to me. */
     private suspend fun anaSendsKey(vararg roster: ro.zapakid.calls.crypto.CallDevice) {
         val ana = CallKeyManager("call-1", ANA, TestSealer(ANA), KeyRing())
-        ana.onRoster(listOf(ANA))
-        ana.onRoster(roster.toList()).filter { it.toDevice == ME }.forEach { events.push(CallSignal.Key(it)) }
+        ana.onRoster(roster.toList(), serverEpoch = events.epoch).filter { it.toDevice == ME }.forEach { events.push(CallSignal.Key(it)) }
     }
 
     @Test
@@ -55,15 +54,18 @@ class CallControllerTest {
 
         events.roster(ME)
         runCurrent()
-        assertEquals("alone, I make the first key", listOf(1), engine.rotations)
+        assertEquals("alone, I make the first key with the server's epoch", listOf(1), engine.rotations)
 
         events.roster(ME, ANA)
         engine.emit(EngineEvent.Connected)
         runCurrent()
+        assertEquals("Ana sorts first, so she leads now", CallState.Connecting, calls.state.value.phase)
+        anaSendsKey(ANA, ME)
+        runCurrent()
 
         assertEquals(CallState.InCall, calls.state.value.phase)
         assertTrue(calls.state.value.encrypted)
-        assertTrue("Ana's phone got the new key", events.sentKeys.any { it.toDevice == ANA && it.epoch == 2 })
+        assertEquals(listOf(1, 2), engine.rotations)
         assertEquals(listOf(ANA), calls.state.value.people.map { it.device })
         assertEquals(listOf(ANA), engine.participants.map { it.device })
     }
@@ -90,7 +92,7 @@ class CallControllerTest {
         anaSendsKey(ANA, ME)
         runCurrent()
         assertEquals(CallState.InCall, calls.state.value.phase)
-        assertEquals(listOf(2), engine.rotations)
+        assertEquals(listOf(1), engine.rotations)
     }
 
     @Test
@@ -117,7 +119,7 @@ class CallControllerTest {
         calls.incoming("call-1", "conv-1", "Ana")
         runCurrent()
 
-        events.push(CallSignal.Ended("caller_left"))
+        events.push(CallSignal.Ended("hung_up"))
         runCurrent()
 
         assertEquals(CallState.Ended(EndReason.Missed), calls.state.value.phase)
@@ -144,7 +146,7 @@ class CallControllerTest {
         calls.startCall("conv-1", "Ana")
         runCurrent()
 
-        events.push(CallSignal.Declined(ANA))
+        events.push(CallSignal.Declined(ANA.account))
         runCurrent()
 
         assertEquals(CallState.Ended(EndReason.Declined), calls.state.value.phase)
@@ -156,10 +158,10 @@ class CallControllerTest {
         calls.startCall("conv-g", "Family", others = 2)
         runCurrent()
 
-        events.push(CallSignal.Declined(ANA))
+        events.push(CallSignal.Declined(ANA.account))
         runCurrent()
         assertEquals(CallState.Calling, calls.state.value.phase)
-        events.push(CallSignal.Declined(ION))
+        events.push(CallSignal.Declined(ION.account))
         runCurrent()
         assertEquals(CallState.Ended(EndReason.Declined), calls.state.value.phase)
     }
@@ -172,6 +174,8 @@ class CallControllerTest {
         events.roster(ME)
         events.roster(ME, ANA)
         engine.emit(EngineEvent.Connected)
+        runCurrent()
+        anaSendsKey(ME, ANA)
         runCurrent()
         val ring = engine.ring!!
         assertTrue(ring.current != null)
@@ -192,6 +196,8 @@ class CallControllerTest {
         events.roster(ME)
         events.roster(ME, ANA)
         engine.emit(EngineEvent.Connected)
+        runCurrent()
+        anaSendsKey(ME, ANA)
         runCurrent()
 
         engine.emit(EngineEvent.Lost)
@@ -257,6 +263,8 @@ class CallControllerTest {
         events.roster(ME)
         events.roster(ME, ANA)
         engine.emit(EngineEvent.Connected)
+        runCurrent()
+        anaSendsKey(ME, ANA)
         runCurrent()
 
         advanceTimeBy(65_000)
