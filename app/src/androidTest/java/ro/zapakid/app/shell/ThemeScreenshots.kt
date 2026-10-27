@@ -34,8 +34,8 @@ import ro.zapakid.chat.ui.ChatScreen
 import ro.zapakid.chat.ui.ConversationListScreen
 
 /**
- * Renders the four main screens in both looks and saves PNGs on the device
- * (Android/data/ro.zapakid.app/files/screens/<role>-<screen>.png) for review. Always passes.
+ * Renders the four main screens in both looks and saves <role>-<screen>.png for review: Gradle pulls them into
+ * app/build/outputs/connected_android_test_additional_output. Always passes.
  */
 class ThemeScreenshots {
     @get:Rule
@@ -101,7 +101,9 @@ class ThemeScreenshots {
     }
 
     private fun save(bitmap: Bitmap, name: String) {
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screens")
+        // AGP pulls additionalTestOutputDir into build/outputs/connected_android_test_additional_output.
+        val pulled = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
+        val dir = pulled ?: File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screens")
         dir.mkdirs()
         File(dir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
