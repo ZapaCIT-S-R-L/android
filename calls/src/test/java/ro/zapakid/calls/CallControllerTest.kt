@@ -38,7 +38,9 @@ class CallControllerTest {
     /** Ana's phone as the key leader: seals her key to me. */
     private suspend fun anaSendsKey(vararg roster: ro.zapakid.calls.crypto.CallDevice) {
         val ana = CallKeyManager("call-1", ANA, TestSealer(ANA), KeyRing())
-        ana.onRoster(roster.toList(), serverEpoch = events.epoch).filter { it.toDevice == ME }.forEach { events.push(CallSignal.Key(it)) }
+        ana.onRoster(roster.toList(), serverEpoch = events.epoch).filter {
+            it.toDevice == ME
+        }.forEach { events.push(CallSignal.Key(it)) }
     }
 
     @Test

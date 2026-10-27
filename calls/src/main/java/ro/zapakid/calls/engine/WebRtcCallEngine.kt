@@ -264,15 +264,17 @@ class WebRtcCallEngine(private val context: Context, private val api: CallsApi) 
 
     internal companion object {
         const val MIC = "mic"
-        const val RATCHET_SALT = "ZapaKid calls v1"
+        const val RATCHET_SALT = "ZapaKid call frame key v1" // the same as iOS
         const val MAGIC_BYTES = 16
+        const val KEY_BITS = 256
         const val FAILURE_TOLERANCE = -1
         const val LEVEL_POLL_MILLIS = 300L
         const val SPEAKING_LEVEL = 0.05
 
-        fun id(device: CallDevice) = "${device.account}:${device.device}"
+        fun id(device: CallDevice) = device.id
 
-        fun trackName(device: CallDevice) = "mic-${device.account}-${device.device}"
+        /** `audio-<accountId>_<deviceId>`: the calls API allows only A-Za-z0-9_- in track names. */
+        fun trackName(device: CallDevice) = "audio-${device.account}_${device.device}"
 
         /**
          * Shared-key mode with a ring of [KeyRing.SIZE]. The "unencrypted magic bytes" let frames that start with
@@ -286,7 +288,8 @@ class WebRtcCallEngine(private val context: Context, private val api: CallsApi) 
             FAILURE_TOLERANCE,
             KeyRing.SIZE,
             true,
-            FrameCryptorKeyDerivationAlgorithm.HKDF
+            FrameCryptorKeyDerivationAlgorithm.HKDF,
+            KEY_BITS
         )
     }
 

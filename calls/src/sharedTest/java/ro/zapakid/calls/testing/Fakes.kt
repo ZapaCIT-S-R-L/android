@@ -28,7 +28,8 @@ val ANA = CallDevice("acc-ana", "1")
 val ION = CallDevice("acc-ion", "3")
 val MIA = CallDevice("acc-mia", "4")
 
-fun participant(device: CallDevice) = Participant(device, listOf("audio-${device.account}_${device.device}"), "sess-${device.device}")
+fun participant(device: CallDevice) =
+    Participant(device, listOf("audio-${device.account}_${device.device}"), "sess-${device.device}")
 
 /** Records calls; the call ID is "call-1" unless set. */
 class FakeCallsApi(var callId: String = "call-1") : CallsApi {

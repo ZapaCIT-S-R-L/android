@@ -20,6 +20,11 @@ class CallKeyManager(
     private var roster: List<CallDevice> = emptyList()
     private var keyedFor: Set<CallDevice> = emptySet()
     private var epoch = -1
+    private var members: Set<CallDevice> = emptySet()
+
+    /** True once this phone holds a key made for the current set of devices (not one from before a join or leave). */
+    var hasCurrentKey: Boolean = false
+        private set
 
     /** Current epoch, -1 before the first key. */
     val currentEpoch: Int get() = epoch
@@ -28,6 +33,10 @@ class CallKeyManager(
     suspend fun onRoster(devices: List<CallDevice>, serverEpoch: Int? = null): List<KeyEnvelope> {
         roster = (devices + self).distinct().sortedBy { it.id }
         val members = roster.toSet()
+        if (members != this.members) {
+            this.members = members
+            hasCurrentKey = false
+        }
         return if (leader() == self && members != keyedFor) rotate(members, serverEpoch) else emptyList()
     }
 
@@ -44,6 +53,7 @@ class CallKeyManager(
         epoch = key.epoch
         keyedFor = members
         ring.install(key)
+        hasCurrentKey = true
         return envelopes
     }
 
@@ -56,6 +66,7 @@ class CallKeyManager(
             // A later leader change must rotate again: it rekeys for its own view of the roster.
             keyedFor = emptySet()
             ring.install(key)
+            hasCurrentKey = true
         }
         return key != null
     }
