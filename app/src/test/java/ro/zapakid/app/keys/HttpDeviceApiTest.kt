@@ -1,0 +1,105 @@
+package ro.zapakid.app.keys
+
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okhttp3.Headers.Companion.headersOf
+import okhttp3.OkHttpClient
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
+import org.junit.Test
+import ro.zapakid.app.auth.AuthApiException
+
+/** Device registration against a mocked API following openapi.yaml ("Draft: Devices and keys"). */
+class HttpDeviceApiTest {
+    private val server = MockWebServer()
+    private lateinit var api: HttpDeviceApi
+
+    private val keys =
+        DeviceKeys(
+            registrationId = 4242,
+            identityKey = "BQidentity",
+            signedPreKey = SignedPreKey(7, "BQsigned", "c2ln"),
+            pqLastResortPreKey = SignedPreKey(9, "CAkyber", "c2ln"),
+            preKeys = listOf(PreKey(8, "BQone")),
+            pqPreKeys = listOf(SignedPreKey(10, "CApq", "c2ln")),
+        )
+
+    @Before
+    fun setUp() {
+        server.start()
+        api = HttpDeviceApi(server.url("/v1/"), OkHttpClient())
+    }
+
+    @After
+    fun tearDown() = server.close()
+
+    private suspend fun expectError(block: suspend () -> Unit): AuthApiException {
+        try {
+            block()
+        } catch (e: AuthApiException) {
+            return e
+        }
+        fail("expected AuthApiException")
+        error("unreachable")
+    }
+
+    @Test
+    fun registerPostsTheDeviceKeysWithTheSessionAndReturnsTheDeviceId() = runTest {
+        server.enqueue(MockResponse(code = 201, body = """{"deviceId":3}"""))
+
+        assertEquals(3, api.register("zks_tok", keys))
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/devices", request.url.encodedPath)
+        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+        assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
+        val body = Json.parseToJsonElement(request.body!!.utf8()).jsonObject
+        assertEquals(setOf("registrationId", "identityKey", "signedPreKey", "pqLastResortPreKey", "preKeys", "pqPreKeys"), body.keys)
+        assertEquals(4242, body["registrationId"]!!.jsonPrimitive.int)
+        assertFalse("no push token yet", body.containsKey("pushToken"))
+    }
+
+    @Test
+    fun aDeviceIdOutsideTheContractRangeIsRejected() = runTest {
+        server.enqueue(MockResponse(code = 201, body = """{"deviceId":128}"""))
+
+        assertEquals("invalid_response", expectError { api.register("zks_tok", keys) }.code)
+    }
+
+    @Test
+    fun registrationErrorsCarryTheApiCode() = runTest {
+        server.enqueue(MockResponse(code = 409, body = """{"error":{"code":"identity_mismatch","message":"x"}}"""))
+        assertEquals("identity_mismatch", expectError { api.register("zks_tok", keys) }.code)
+
+        server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"unauthorized","message":"x"}}"""))
+        assertTrue(expectError { api.register("zks_tok", keys) }.isUnauthorized)
+
+        server.enqueue(
+            MockResponse(code = 429, headers = headersOf("Retry-After", "60"), body = """{"error":{"code":"rate_limited","message":"x"}}"""),
+        )
+        assertEquals(60L, expectError { api.register("zks_tok", keys) }.retryAfterSeconds)
+    }
+
+    @Test
+    fun theAccountsIdentityExistsWhenTheKeyDirectoryHasOne() = runTest {
+        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQidentity","changes":[]}"""))
+        assertTrue(api.accountHasIdentity("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/v1/accounts/7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11/identity", request.url.encodedPath)
+        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+
+        server.enqueue(MockResponse(code = 404, body = """{"error":{"code":"not_found","message":"x"}}"""))
+        assertFalse(api.accountHasIdentity("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+    }
+}
