@@ -27,6 +27,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
     private val changes = MutableStateFlow(0L)
     private val json = Json { ignoreUnknownKeys = true }
 
+    // Selection arguments go as String[]: the Object[] overload of rawQuery didn't bind them (no rows came back).
     init {
         System.loadLibrary("sqlcipher")
         val file = context.getDatabasePath(name).also { it.parentFile?.mkdirs() }
@@ -49,7 +50,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
     }
 
     override fun conversations(): Flow<List<Conversation>> = changes.map {
-        db.rawQuery("SELECT * FROM conversations ORDER BY last_at DESC", arrayOf<Any>()).use { c ->
+        db.rawQuery("SELECT * FROM conversations ORDER BY last_at DESC", arrayOf<String>()).use { c ->
             c.all(::conversation)
         }
     }.flowOn(Dispatchers.IO)
@@ -57,7 +58,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
     override fun messages(conversationId: String): Flow<List<Message>> = changes.map {
         db.rawQuery(
             "SELECT * FROM messages WHERE conversation_id = ? ORDER BY sent_at",
-            arrayOf<Any>(conversationId)
+            arrayOf<String>(conversationId)
         ).use { c ->
             c.all(::message)
         }
@@ -119,7 +120,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
     }
 
     override suspend fun conversation(id: String): Conversation? = io {
-        db.rawQuery("SELECT * FROM conversations WHERE id = ?", arrayOf<Any>(id)).use { c ->
+        db.rawQuery("SELECT * FROM conversations WHERE id = ?", arrayOf<String>(id)).use { c ->
             c.all(::conversation).firstOrNull()
         }
     }
