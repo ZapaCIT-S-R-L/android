@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,7 +16,6 @@ import ro.zapakid.app.family.Kid
 import ro.zapakid.app.family.KidSession
 import ro.zapakid.app.testing.FakeBlockStore
 import ro.zapakid.app.testing.TestBlobCipher
-import java.util.Base64
 
 /**
  * A kid's phone after pairing (api PR #74): its own libsignal identity (kids have no Block Store sync), POST
@@ -52,11 +52,13 @@ class KidDeviceRegistrationTest {
     }
 
     private val api = FakeDeviceApi()
-    private val accounts = AccountKeys(folder.root.resolve("keys"), TestBlobCipher(), FakeBlockStore())
+    private val accounts by lazy { AccountKeys(folder.root.resolve("keys"), TestBlobCipher(), FakeBlockStore()) }
     private var session: KidSession? = mia
     private var revoked = 0
 
-    private fun registration() = KidDeviceRegistration(accounts, api, { session }, onRevoked = { revoked++ }, oneTimeKeys = 3)
+    private fun registration() = KidDeviceRegistration(accounts, api, {
+        session
+    }, onRevoked = { revoked++ }, oneTimeKeys = 3)
 
     @Test
     fun afterPairingThePhoneMakesItsIdentityAndRegistersWithTheKidSession() = runTest {
@@ -122,7 +124,10 @@ class KidDeviceRegistrationTest {
         val chatKey = folder.newFile("chat-db.key")
         var cleared = false
 
-        val revocation = KidRevocation(accounts, kidId = { "kid-mia" }, clearSession = { cleared = true }, files = listOf(chatDb, chatKey))
+        val revocation =
+            KidRevocation(accounts, kidId = {
+                "kid-mia"
+            }, clearSession = { cleared = true }, files = listOf(chatDb, chatKey))
         revocation.revoke()
 
         assertNull(accounts.records("kid-mia").get("local-identity", "identity-key-pair"))

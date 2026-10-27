@@ -216,7 +216,10 @@ class HttpDeviceApiTest {
         assertEquals("PUT", request.method)
         assertEquals("/v1/keys/identity", request.url.encodedPath)
         assertEquals("Bearer $kidToken", request.headers["Authorization"])
-        assertEquals(4242, Json.parseToJsonElement(request.body!!.utf8()).jsonObject["registrationId"]!!.jsonPrimitive.int)
+        assertEquals(
+            4242,
+            Json.parseToJsonElement(request.body!!.utf8()).jsonObject["registrationId"]!!.jsonPrimitive.int
+        )
     }
 }
 

@@ -73,7 +73,10 @@ class ChatTokenClientTest {
     @Test
     fun aRevokedSessionIsReported() = runTest {
         var revoked = 0
-        val client = ChatTokenClient(server.url("/v1/"), OkHttpClient(), session = { "zkk_session" }, onUnauthorized = { revoked++ })
+        val client =
+            ChatTokenClient(server.url("/v1/"), OkHttpClient(), session = {
+                "zkk_session"
+            }, onUnauthorized = { revoked++ })
         server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"unauthorized","message":"x"}}"""))
 
         runCatching { client.token() }

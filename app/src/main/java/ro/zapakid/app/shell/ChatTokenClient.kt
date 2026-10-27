@@ -25,7 +25,9 @@ class ChatTokenClient(
     private val baseUrl: HttpUrl,
     private val client: OkHttpClient,
     private val session: () -> String?,
-    private val now: () -> Instant = Instant::now
+    private val now: () -> Instant = Instant::now,
+    /** The session was revoked (401): a kid phone wipes itself and goes back to pairing. */
+    private val onUnauthorized: () -> Unit = {}
 ) : ChatTokenProvider,
     ro.zapakid.chat.net.ChatTokens {
     @Serializable
@@ -60,6 +62,7 @@ class ChatTokenClient(
                 .post(ByteArray(0).toRequestBody(null))
                 .build()
         client.newCall(request).execute().use { response ->
+            if (response.code == UNAUTHORIZED) onUnauthorized()
             check(response.isSuccessful) { "chat token: HTTP ${response.code}" }
             json.decodeFromString(Token.serializer(), response.body.string()).also { cached = it }.token
         }
@@ -67,5 +70,6 @@ class ChatTokenClient(
 
     private companion object {
         const val MARGIN_SECONDS = 60L
+        const val UNAUTHORIZED = 401
     }
 }
