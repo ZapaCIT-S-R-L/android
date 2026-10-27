@@ -122,8 +122,7 @@ class CallScreenTest {
         val ana = CallKeyManager("call-1", ANA, TestSealer(ANA), KeyRing())
         val envelope =
             kotlinx.coroutines.runBlocking {
-                ana.onRoster(listOf(ANA))
-                ana.onRoster(listOf(ANA, ME)).single()
+                ana.onRoster(listOf(ANA, ME), serverEpoch = events.epoch).single()
             }
         onMain { events.push(CallSignal.Key(envelope)) }
 
