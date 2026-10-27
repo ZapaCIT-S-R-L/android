@@ -139,7 +139,7 @@ private fun Status(state: CallUiState, clock: () -> Long) {
                 if (state.group) {
                     pluralStringResource(R.plurals.call_people_count, state.people.size + 1, state.people.size + 1)
                 } else {
-                    elapsed(state.connectedAtMillis, clock)
+                    stringResource(R.string.call_in_call) + " · " + elapsed(state.connectedAtMillis, clock)
                 }
 
             is CallState.Ended -> stringResource(endText(phase.reason, state.direction))
