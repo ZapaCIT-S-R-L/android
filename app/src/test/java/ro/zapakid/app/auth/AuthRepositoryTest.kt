@@ -243,7 +243,8 @@ class AuthRepositoryTest {
 
     @Test
     fun restoreRefreshesTheProfileForAStoredSession() = runTest {
-        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA.copy(displayName = "Old name"))
+        store.session =
+            Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA.copy(displayName = "Old name"))
 
         assertEquals(ANA, repository.restore())
         assertEquals(ANA, store.session?.parent)

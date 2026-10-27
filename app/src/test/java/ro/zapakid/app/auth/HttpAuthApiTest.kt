@@ -18,9 +18,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
-import ro.zapakid.app.testing.ContractRecorder
 import ro.zapakid.app.testing.APPLE_CODE
 import ro.zapakid.app.testing.APPLE_STATE
+import ro.zapakid.app.testing.ContractRecorder
 import ro.zapakid.app.testing.NONCE
 
 /** The auth client against a mocked API that follows openapi.yaml in ZapaCIT-S-R-L/api (PR #5). */
@@ -207,8 +207,8 @@ class HttpAuthApiTest {
             MockResponse(
                 code = 502,
                 headers = headersOf(ContractRecorder.OFF_SPEC, "robustness: a proxy error page"),
-                body = "<html>Bad gateway</html>",
-            ),
+                body = "<html>Bad gateway</html>"
+            )
         )
 
         val e = expectError { api.me("zks_tok0000000000000000000000000000000000000000") }

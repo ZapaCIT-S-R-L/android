@@ -16,8 +16,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
-import ro.zapakid.app.testing.ContractRecorder
 import ro.zapakid.app.auth.AuthApiException
+import ro.zapakid.app.testing.ContractRecorder
 
 /** Device registration against a mocked API following openapi.yaml ("Draft: Devices and keys"). */
 class HttpDeviceApiTest {
@@ -75,19 +75,41 @@ class HttpDeviceApiTest {
 
     @Test
     fun aDeviceIdOutsideTheContractRangeIsRejected() = runTest {
-        server.enqueue(MockResponse(code = 201, headers = offSpec("robustness: a server bug"), body = """{"deviceId":128}"""))
+        server.enqueue(
+            MockResponse(code = 201, headers = offSpec("robustness: a server bug"), body = """{"deviceId":128}""")
+        )
 
-        assertEquals("invalid_response", expectError { api.register("zks_tok0000000000000000000000000000000000000000", keys) }.code)
+        assertEquals(
+            "invalid_response",
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.code
+        )
     }
 
     @Test
     fun registrationErrorsCarryTheApiCode() = runTest {
         server.enqueue(
-            MockResponse(code = 409, headers = offSpec(API_GAP_DEVICE_ERRORS), body = """{"error":{"code":"identity_mismatch","message":"x"}}"""),
+            MockResponse(
+                code = 409,
+                headers = offSpec(API_GAP_DEVICE_ERRORS),
+                body = """{"error":{"code":"identity_mismatch","message":"x"}}"""
+            )
         )
-        assertEquals("identity_mismatch", expectError { api.register("zks_tok0000000000000000000000000000000000000000", keys) }.code)
+        assertEquals(
+            "identity_mismatch",
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.code
+        )
 
-        server.enqueue(MockResponse(code = 401, headers = offSpec(API_GAP_DEVICE_ERRORS), body = """{"error":{"code":"unauthorized","message":"x"}}"""))
+        server.enqueue(
+            MockResponse(
+                code = 401,
+                headers = offSpec(API_GAP_DEVICE_ERRORS),
+                body = """{"error":{"code":"unauthorized","message":"x"}}"""
+            )
+        )
         assertTrue(expectError { api.register("zks_tok0000000000000000000000000000000000000000", keys) }.isUnauthorized)
 
         server.enqueue(
@@ -97,13 +119,23 @@ class HttpDeviceApiTest {
                 body = """{"error":{"code":"rate_limited","message":"x"}}"""
             )
         )
-        assertEquals(60L, expectError { api.register("zks_tok0000000000000000000000000000000000000000", keys) }.retryAfterSeconds)
+        assertEquals(
+            60L,
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.retryAfterSeconds
+        )
     }
 
     @Test
     fun theAccountsIdentityExistsWhenTheKeyDirectoryHasOne() = runTest {
         server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQidentity","changes":[]}"""))
-        assertTrue(api.accountHasIdentity("zks_tok0000000000000000000000000000000000000000", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+        assertTrue(
+            api.accountHasIdentity(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
+        )
         val request = server.takeRequest()
         assertEquals("GET", request.method)
         assertEquals("/v1/accounts/7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11/identity", request.url.encodedPath)
@@ -113,10 +145,15 @@ class HttpDeviceApiTest {
             MockResponse(
                 code = 404,
                 headers = offSpec("API gap: 404 for an account without an identity is not in the contract"),
-                body = """{"error":{"code":"not_found","message":"x"}}""",
-            ),
+                body = """{"error":{"code":"not_found","message":"x"}}"""
+            )
         )
-        assertFalse(api.accountHasIdentity("zks_tok0000000000000000000000000000000000000000", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+        assertFalse(
+            api.accountHasIdentity(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
+        )
     }
 }
 

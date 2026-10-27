@@ -1,11 +1,11 @@
 package ro.zapakid.app.testing
 
+import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okio.Buffer
-import java.io.File
 
 /**
  * Records every HTTP exchange of the JVM tests (the request the app built, the response the fake returned) for the
@@ -22,7 +22,7 @@ object ContractRecorder {
         val requestBody: String?,
         val status: Int,
         val responseBody: String?,
-        val offSpec: String? = null,
+        val offSpec: String? = null
     )
 
     private val out: File? = System.getProperty("contract.out")?.let(::File)
@@ -44,8 +44,8 @@ object ContractRecorder {
                     requestBody = requestBody?.takeIf { it.isNotEmpty() },
                     status = response.code,
                     responseBody = responseBody.takeIf { it.isNotEmpty() },
-                    offSpec = response.header(OFF_SPEC),
-                ),
+                    offSpec = response.header(OFF_SPEC)
+                )
             )
             response
         }
