@@ -204,6 +204,20 @@ class HttpDeviceApiTest {
 
         assertEquals(null, server.takeRequest().headers["ZapaKid-Attestation"])
     }
+
+    @Test
+    fun aReplacedKidPhoneChangesTheIdentityWithAPut() = runTest {
+        server.enqueue(MockResponse(code = 200, body = """{"deviceId":1}"""))
+        val kidToken = "zkk_" + "k".repeat(43)
+
+        assertEquals(1, api.changeIdentity(kidToken, keys))
+
+        val request = server.takeRequest()
+        assertEquals("PUT", request.method)
+        assertEquals("/v1/keys/identity", request.url.encodedPath)
+        assertEquals("Bearer $kidToken", request.headers["Authorization"])
+        assertEquals(4242, Json.parseToJsonElement(request.body!!.utf8()).jsonObject["registrationId"]!!.jsonPrimitive.int)
+    }
 }
 
 private const val API_GAP_DEVICE_ERRORS = "API gap: POST /v1/devices declares only 201"
