@@ -64,7 +64,12 @@ fun ZapaKidApp(
             val device by deviceSetup.state.collectAsStateWithLifecycle()
             when {
                 family == null ->
-                    HomeScreen(parent = s.parent, device = device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
+                    HomeScreen(
+                        parent = s.parent,
+                        device = device,
+                        onRetryDevice = deviceSetup::retry,
+                        onSignOut = viewModel::logout
+                    )
 
                 shell == null -> FamilyRoute(family, onSignOut = viewModel::logout)
 

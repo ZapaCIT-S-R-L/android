@@ -75,17 +75,32 @@ class AppGraph(
         )
     }
 
+    /** This phone's libsignal records: Keystore-encrypted files in noBackupFilesDir (never backed up). */
+    private val accountKeys by lazy {
+        AccountKeys(File(app.noBackupFilesDir, "keys"), KeystoreBlobCipher("zapakid.keys.v1"), PlayBlockStoreApi(app))
+    }
+
+    val deviceRegistration: DeviceRegistrar by lazy {
+        deviceRegistrar ?: DeviceRegistration(
+            accounts = accountKeys,
+            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http, integrity),
+            session = authRepository::currentSession,
+            // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
+            reshare = {}
+        )
+    }
+
     val familyApi: FamilyApi by lazy {
         familyApi ?: HttpFamilyApi(
             BuildConfig.API_BASE_URL.toHttpUrl(),
             http,
-            PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+            integrity
         )
     }
 
     /** A paired kid phone's session, encrypted like the parent session. */
     val kidSessionStore: KidSessionStore by lazy {
-        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreSessionCipher())
+        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreBlobCipher())
     }
 
     /** Chat tokens for chat and calls, from the parent session or, on a kid phone, the kid session. */
@@ -127,23 +142,9 @@ class AppGraph(
 
 /** The Keystore cipher of the session store, wrapping the chat database key. */
 private class KeystoreKeyWrapper : ro.zapakid.chat.data.KeyWrapper {
-    private val cipher = KeystoreSessionCipher()
+    private val cipher = KeystoreBlobCipher()
 
     override fun wrap(plain: ByteArray) = cipher.encrypt(plain)
 
     override fun unwrap(wrapped: ByteArray) = cipher.decrypt(wrapped)
-    /** This phone's libsignal records: Keystore-encrypted files in noBackupFilesDir (never backed up). */
-    private val accountKeys by lazy {
-        AccountKeys(File(app.noBackupFilesDir, "keys"), KeystoreBlobCipher("zapakid.keys.v1"), PlayBlockStoreApi(app))
-    }
-
-    val deviceRegistration: DeviceRegistrar by lazy {
-        deviceRegistrar ?: DeviceRegistration(
-            accounts = accountKeys,
-            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http, integrity),
-            session = authRepository::currentSession,
-            // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
-            reshare = {}
-        )
-    }
 }

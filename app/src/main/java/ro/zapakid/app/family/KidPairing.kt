@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import ro.zapakid.app.auth.SessionCipher
+import ro.zapakid.app.auth.BlobCipher
 
 /** Reads a QR code with the camera; returns null when the kid closes the scanner. */
 fun interface QrScanner {
@@ -40,7 +40,7 @@ interface KidSessionStore {
 }
 
 /** The kid session as one encrypted file in noBackupFilesDir, like the parent session. */
-class EncryptedKidSessionStore(private val file: File, private val cipher: SessionCipher) : KidSessionStore {
+class EncryptedKidSessionStore(private val file: File, private val cipher: BlobCipher) : KidSessionStore {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Synchronized
