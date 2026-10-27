@@ -20,6 +20,8 @@ fun cloudProjectNumber(): Long {
 android {
     namespace = "ro.zapakid.app"
     compileSdk = 37
+    // Latest stable NDK, used only to strip native symbols (libsignal ships unstripped .so files).
+    ndkVersion = "30.0.16248370"
 
     defaultConfig {
         // App id decided 2026-10-26 (its own Play Console app). test/app-id.test.js keeps the old one out.
@@ -65,13 +67,23 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        // libsignal-client is built for Java 21.
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+        // Required by libsignal-android (java.time and friends on API 26).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        // libsignal ships extra natives for its own tests; they must never reach the app.
+        jniLibs.excludes += setOf("**/libsignal_jni_testing.so")
+        // libsignal-client also carries desktop natives (macOS, Linux, Windows) as Java resources, for JVM unit tests.
+        resources.excludes += setOf("libsignal_jni*.dylib", "libsignal_jni*.so", "signal_jni*.dll")
     }
 
     lint {
@@ -94,7 +106,7 @@ android {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 detekt {
@@ -117,6 +129,8 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.play.age.signals)
     implementation(libs.play.integrity)
+    implementation(libs.libsignal.android)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.browser)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

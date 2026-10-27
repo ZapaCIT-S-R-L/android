@@ -4,9 +4,15 @@
 # Version updates: weekly. Versions are pinned exactly in gradle/libs.versions.toml; actions are pinned by commit SHA.
 # A Gradle bump also needs gradle/verification-metadata.xml refreshed (see CONTRIBUTING.md); CI fails until it is.
 version: 2
+registries:
+  # libsignal is published only to Signal's repository (see settings.gradle.kts).
+  signal:
+    type: maven-repository
+    url: https://build-artifacts.signal.org/libraries/maven/
 updates:
   - package-ecosystem: gradle
     directory: /
+    registries: "*"
     schedule:
       interval: weekly
     groups:

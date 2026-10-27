@@ -22,6 +22,12 @@ test("libsignal's test-only native libraries are kept out of the app", () => {
   assert.match(app, /"\*\*\/libsignal_jni_testing\.so"/);
 });
 
+test("libsignal's desktop natives are kept out of the app", () => {
+  for (const pattern of ["libsignal_jni*.dylib", "libsignal_jni*.so", "signal_jni*.dll"]) {
+    assert.ok(app.includes(`"${pattern}"`), pattern);
+  }
+});
+
 test("Dependabot can see libsignal releases", () => {
   const dependabot = readFileSync(".github/dependabot.yml", "utf8");
   assert.match(dependabot, /url: https:\/\/build-artifacts\.signal\.org\/libraries\/maven\//);

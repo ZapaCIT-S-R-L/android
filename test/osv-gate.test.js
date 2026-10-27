@@ -1,7 +1,7 @@
 // Tests for scripts/osv-gate.js: does an OSV-Scanner JSON report block the build?
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blockingVulnerabilities } from "../scripts/osv-gate.js";
+import { blockingVulnerabilities, warnings } from "../scripts/osv-gate.js";
 
 const report = (groups) => ({
   results: [
@@ -38,4 +38,16 @@ test("an unknown severity blocks until someone rates it (security first)", () =>
 
 test("a report without the results list is rejected, not treated as clean", () => {
   assert.throws(() => blockingVulnerabilities({}), /not an OSV-Scanner report/);
+});
+
+test("with unrated: warn (libsignal's Rust crates), unrated findings are listed, not blocking", () => {
+  const groups = [{ ids: ["RUSTSEC-unmaintained"], max_severity: "" }, { ids: ["GHSA-high"], max_severity: "8.1" }];
+  assert.deepEqual(
+    blockingVulnerabilities(report(groups), { unrated: "warn" }).map((v) => v.id),
+    ["GHSA-high"],
+  );
+  assert.deepEqual(
+    warnings(report(groups), { unrated: "warn" }).map((v) => v.id),
+    ["RUSTSEC-unmaintained"],
+  );
 });

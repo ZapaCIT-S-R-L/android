@@ -7,7 +7,7 @@ Kotlin, Jetpack Compose, minSdk 26. Licensed under the [AGPL-3.0](LICENSE).
 
 ## Build and test
 
-Requirements: JDK 17 and the Android SDK (`local.properties` with `sdk.dir=...`, not committed).
+Requirements: JDK 21 and the Android SDK (`local.properties` with `sdk.dir=...`, not committed).
 
 ```sh
 ./gradlew assembleDebug              # debug APK
