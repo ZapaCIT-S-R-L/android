@@ -22,12 +22,14 @@ import ro.zapakid.calls.crypto.KeyRing
 import ro.zapakid.calls.engine.CallEngine
 import ro.zapakid.calls.engine.EngineEvent
 
-val ME = CallDevice("acc-me", "dev-me")
-val ANA = CallDevice("acc-ana", "dev-ana")
-val ION = CallDevice("acc-ion", "dev-ion")
-val MIA = CallDevice("acc-mia", "dev-mia")
+// Ids sort acc-ana.1 < acc-ion.3 < acc-me.2 < acc-mia.4: Ana leads whenever she is in the call.
+val ME = CallDevice("acc-me", "2")
+val ANA = CallDevice("acc-ana", "1")
+val ION = CallDevice("acc-ion", "3")
+val MIA = CallDevice("acc-mia", "4")
 
-fun participant(device: CallDevice) = Participant(device, listOf("mic-${device.device}"), "sess-${device.device}")
+fun participant(device: CallDevice) =
+    Participant(device, listOf("audio-${device.account}_${device.device}"), "sess-${device.device}")
 
 /** Records calls; the call ID is "call-1" unless set. */
 class FakeCallsApi(var callId: String = "call-1") : CallsApi {
@@ -69,6 +71,10 @@ class FakeEvents :
     private val channel = Channel<CallSignal>(Channel.UNLIMITED)
     override val signals: Flow<CallSignal> = channel.receiveAsFlow()
     val sentKeys = mutableListOf<KeyEnvelope>()
+    var pings = 0
+
+    /** The server's key epoch: up by one on every roster change, as on the calls service. */
+    var epoch = 0
     var connectedTo: String? = null
     var closed = false
 
@@ -78,9 +84,11 @@ class FakeEvents :
         channel.trySend(signal)
     }
 
-    fun roster(vararg devices: CallDevice) = push(CallSignal.Roster(devices.map(::participant)))
+    fun roster(vararg devices: CallDevice) = push(CallSignal.Roster(devices.map(::participant), ++epoch))
 
-    override fun sendKey(envelope: KeyEnvelope): Boolean = sentKeys.add(envelope)
+    override fun sendKeys(epoch: Int, envelopes: List<KeyEnvelope>): Boolean = sentKeys.addAll(envelopes).let { true }
+
+    override fun ping(): Boolean = true.also { pings++ }
 
     override fun close() {
         closed = true

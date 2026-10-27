@@ -1,7 +1,12 @@
 package ro.zapakid.calls.crypto
 
-/** One phone in a call: the account (token `sub`) and its device (token `dev`). */
-data class CallDevice(val account: String, val device: String)
+/**
+ * One phone in a call: the account (token `sub`) and its libsignal device id (token `dev`, 1-127, as text).
+ * [id] is `<accountId>.<deviceId>`, the same on iOS; the lowest [id] in the roster is the key leader.
+ */
+data class CallDevice(val account: String, val device: String) {
+    val id: String get() = "$account.$device"
+}
 
 class CallKeySealerException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
