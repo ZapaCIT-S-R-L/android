@@ -24,6 +24,8 @@ rootProject.name = "ZapaKid"
 include(":app")
 // Voice calls (Cloudflare Realtime, end-to-end encrypted frames). One feature module per backend service.
 include(":calls")
+// Chats (services/chat): sealed per device, stored in a SQLCipher database.
+include(":chat")
 
 // Security floors for transitive build-tool dependencies (AGP, lint, detekt, ktlint), raised when OSV-Scanner reports
 // a high or critical advisory and the tool hasn't caught up yet. A floor only ever raises a version. Remove an entry
