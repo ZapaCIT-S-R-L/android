@@ -42,7 +42,10 @@ it: change `libsignal` in `gradle/libs.versions.toml` to the new release tag of
 ## Before every push
 
 `./scripts/ci-local.sh` runs the CI checks on your machine (JDK 21, Node 24, osv-scanner, gitleaks, actionlint):
-build, unit tests, lint, OSV, gitleaks, and the emulator tests when an emulator is attached. Push only when it passes.
+build, unit tests, lint, OSV, gitleaks, and the emulator tests on a local headless emulator (`scripts/emulator.sh`;
+install it once with `sdkmanager "emulator" "system-images;android-37.0;google_apis;arm64-v8a"`). It refuses to start
+the emulator next to an iOS build or simulator, or with a physical phone attached, and shuts it down after the run.
+Push only when it passes.
 
 ## Contributor License Agreement
 

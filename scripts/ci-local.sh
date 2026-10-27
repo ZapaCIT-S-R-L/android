@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # The CI checks on this machine, before every push (Stefan's rule): build, JVM unit tests, lint/ktlint/detekt,
-# actionlint, npm test, OSV (dependencies + libsignal's Rust crates), gitleaks. Emulator UI tests run only when an
-# emulator is attached (adb); otherwise CI's `ui` job runs them. Gradle stays throttled by ~/.gradle/gradle.properties
-# (2 workers) and stops its daemon at the end. Needs JDK 21 (JAVA_HOME), osv-scanner, gitleaks, actionlint, Node 24.
+# actionlint, npm test, OSV (dependencies + libsignal's Rust crates), gitleaks, and the emulator UI tests on the local
+# emulator (scripts/emulator.sh: headless, 2 GB, refused while xcodebuild or an iOS simulator runs or a phone is
+# attached, shut down after the run). SKIP_UI=1 skips them (say so in the PR). Gradle stays throttled by
+# ~/.gradle/gradle.properties (2 workers) and stops its daemon at the end. Needs JDK 21, osv-scanner, gitleaks,
+# actionlint, Node 24, and the emulator + system-images;android-37.0;google_apis;arm64-v8a (sdkmanager).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 trap './gradlew --stop -q || true' EXIT
+if [ "${SKIP_UI:-}" != 1 ]; then node scripts/emulator-guard.js; fi
 if pgrep -x xcodebuild >/dev/null; then echo "xcodebuild is running: one heavy build at a time. Try later." >&2; exit 1; fi
 tmp=$(mktemp -d)
 
@@ -20,11 +23,14 @@ for x in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
 print(f"unit tests: {t} run, {f} failed")
 PY
 
-if command -v adb >/dev/null && adb devices | grep -q "emulator-"; then
-  echo "== Emulator UI tests"
-  ./gradlew connectedDebugAndroidTest
+if [ "${SKIP_UI:-}" = 1 ]; then
+  echo "== Emulator UI tests: SKIPPED (SKIP_UI=1); say so in the PR, CI's ui job runs them"
 else
-  echo "== Emulator UI tests: no emulator attached, CI's ui job runs them"
+  echo "== Emulator UI tests (local emulator, headless, 2 GB)"
+  trap './scripts/emulator.sh stop; ./gradlew --stop -q || true' EXIT
+  ./scripts/emulator.sh start
+  ANDROID_SERIAL=emulator-5584 ./gradlew connectedDebugAndroidTest
+  ./scripts/emulator.sh stop
 fi
 
 echo "== actionlint"; actionlint
