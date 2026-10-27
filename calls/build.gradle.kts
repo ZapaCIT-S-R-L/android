@@ -27,6 +27,12 @@ android {
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
     }
 
+    sourceSets {
+        // Fakes shared by the JVM tests and the emulator tests (calls service, event socket, media engine).
+        getByName("test").kotlin.directories.add("src/sharedTest/java")
+        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = false
     }
@@ -48,6 +54,7 @@ ktlint {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.webrtc)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 
