@@ -32,7 +32,7 @@ class CallKeyManagerTest {
         val phoneA = Phone(a)
 
         assertEquals(emptyList<KeyEnvelope>(), phoneA.keys.onRoster(listOf(a)))
-        assertEquals(1, phoneA.ring.current?.epoch)
+        assertEquals("epochs start at 0, as on iOS", 0, phoneA.ring.current?.epoch)
     }
 
     @Test
@@ -43,18 +43,18 @@ class CallKeyManagerTest {
         phoneA.keys.onRoster(listOf(a))
         phoneB.keys.onRoster(listOf(a, b))
         deliver(phoneA.keys.onRoster(listOf(a, b)), phoneB)
-        assertEquals(2, phoneB.ring.current?.epoch)
+        assertEquals(1, phoneB.ring.current?.epoch)
         assertArrayEquals(phoneA.ring.current!!.bytes(), phoneB.ring.current!!.bytes())
 
         phoneB.keys.onRoster(listOf(a, b, c))
         phoneC.keys.onRoster(listOf(a, b, c))
         val envelopes = phoneA.keys.onRoster(listOf(a, b, c))
         assertEquals(setOf(b, c), envelopes.map { it.toDevice }.toSet())
-        assertTrue(envelopes.all { it.epoch == 3 && it.fromDevice == a })
+        assertTrue(envelopes.all { it.epoch == 2 && it.fromDevice == a })
         deliver(envelopes, phoneB, phoneC)
 
-        assertEquals(3, phoneC.ring.current?.epoch)
-        assertNull("the newcomer never gets the earlier key", phoneC.ring.get(2))
+        assertEquals(2, phoneC.ring.current?.epoch)
+        assertNull("the newcomer never gets the earlier key", phoneC.ring.get(1))
         assertArrayEquals(phoneA.ring.current!!.bytes(), phoneC.ring.current!!.bytes())
     }
 
@@ -173,7 +173,9 @@ class CallKeyManagerTest {
 
         val payload = SealedKeyPayload.encode("c1", key)
 
-        val expected = "ZKCK".encodeToByteArray() + byteArrayOf(1, 1, 2, 3, 4) + ByteArray(32) { it.toByte() } + "c1".encodeToByteArray()
+        val expected =
+            "ZKCK".encodeToByteArray() + byteArrayOf(1, 1, 2, 3, 4) + ByteArray(32) { it.toByte() } +
+                "c1".encodeToByteArray()
         assertArrayEquals(expected, payload)
     }
 

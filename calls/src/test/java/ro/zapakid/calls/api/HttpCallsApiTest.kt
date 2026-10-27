@@ -47,13 +47,20 @@ class HttpCallsApiTest {
         """[{"urls":["stun:stun.cloudflare.com:3478","turn:turn.cloudflare.com:3478?transport=udp"],
            "username":"u1","credential":"c1"}]"""
 
+    private val limits = """{"maxParticipants":8,"ringTimeoutSeconds":45,"maxDurationSeconds":7200}"""
+
     private val callJson =
         """{"callId":"call-1","conversationId":"conv-9","state":"ringing","createdAt":"x","ringDeadline":"y","epoch":1,
            "keyLeader":{"accountId":"acc-a","deviceId":1},"participants":[],"declined":[],"endReason":null}"""
 
     @Test
     fun startingACallSendsTheConversationWithTheChatTokenAndReturnsIceServers() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"call":$callJson,"iceServers":$iceJson,"limits":{"maxParticipants":8,"ringTimeoutSeconds":45,"maxDurationSeconds":7200}}"""))
+        server.enqueue(
+            MockResponse(
+                code = 201,
+                body = """{"call":$callJson,"iceServers":$iceJson,"limits":$limits}"""
+            )
+        )
 
         val call = api.create("conv-9")
 

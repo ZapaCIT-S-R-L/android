@@ -71,8 +71,7 @@ class CallEventsClientTest {
     @After
     fun tearDown() = server.close()
 
-    private fun client() =
-        CallEventsClient(baseUrl = server.url("/v1/"), client = OkHttpClient(), tokens = FakeChatTokens())
+    private fun client() = CallEventsClient(server.url("/v1/"), OkHttpClient(), FakeChatTokens(), self)
 
     @Test
     fun parsesRosterKeysAndCallEvents() = runBlocking {
