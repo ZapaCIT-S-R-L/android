@@ -1,8 +1,8 @@
 package ro.zapakid.app.testing
 
 import java.io.File
-import org.signal.libsignal.protocol.SignalProtocolAddress
 import kotlinx.coroutines.runBlocking
+import org.signal.libsignal.protocol.SignalProtocolAddress
 import ro.zapakid.app.keys.BlockStoreApi
 import ro.zapakid.app.keys.BlockStoreIdentityBackup
 import ro.zapakid.app.keys.DeviceBundle
@@ -19,11 +19,15 @@ import ro.zapakid.app.keys.ZapaKidProtocolStore
 class Phone(
     val dir: File,
     val cipher: TestBlobCipher = TestBlobCipher(),
-    val backup: FakeBlockStore = FakeBlockStore(),
+    val backup: FakeBlockStore = FakeBlockStore()
 ) {
     val records = EncryptedRecordStore(dir, cipher)
     val identity =
-        (runBlocking { LocalIdentity(records, BlockStoreIdentityBackup(backup)).resolve(false, NoReshare) } as LocalIdentity.State.Ready)
+        (
+            runBlocking {
+                LocalIdentity(records, BlockStoreIdentityBackup(backup)).resolve(false, NoReshare)
+            } as LocalIdentity.State.Ready
+            )
             .identity
     val store = ZapaKidProtocolStore(records, identity)
 
@@ -31,24 +35,15 @@ class Phone(
 }
 
 /** Block Store on the JVM: a map, and whether Google's end-to-end encrypted cloud backup is available. */
-class FakeBlockStore(
-    var endToEndEncryption: Boolean = true,
-) : BlockStoreApi {
-    class Item(
-        val bytes: ByteArray,
-        val backupToCloud: Boolean,
-    )
+class FakeBlockStore(var endToEndEncryption: Boolean = true) : BlockStoreApi {
+    class Item(val bytes: ByteArray, val backupToCloud: Boolean)
 
     val items = mutableMapOf<String, Item>()
     var stores = 0
 
     override suspend fun isEndToEndEncryptionAvailable(): Boolean = endToEndEncryption
 
-    override suspend fun store(
-        key: String,
-        bytes: ByteArray,
-        backupToCloud: Boolean,
-    ) {
+    override suspend fun store(key: String, bytes: ByteArray, backupToCloud: Boolean) {
         stores++
         items[key] = Item(bytes.copyOf(), backupToCloud)
     }

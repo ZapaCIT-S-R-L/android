@@ -24,10 +24,8 @@ class IdentitySyncTest {
 
     private val blockStore = FakeBlockStore()
 
-    private fun identityOn(
-        dir: String,
-        cipher: TestBlobCipher = TestBlobCipher(),
-    ) = LocalIdentity(EncryptedRecordStore(folder.root.resolve(dir), cipher), BlockStoreIdentityBackup(blockStore))
+    private fun identityOn(dir: String, cipher: TestBlobCipher = TestBlobCipher()) =
+        LocalIdentity(EncryptedRecordStore(folder.root.resolve(dir), cipher), BlockStoreIdentityBackup(blockStore))
 
     private fun LocalIdentity.State.ready() = (this as LocalIdentity.State.Ready).identity
 
@@ -50,8 +48,14 @@ class IdentitySyncTest {
         assertTrue(blockStore.items.getValue(BlockStoreIdentityBackup.KEY).backupToCloud)
 
         val noE2e = FakeBlockStore(endToEndEncryption = false)
-        LocalIdentity(EncryptedRecordStore(folder.root.resolve("b"), TestBlobCipher()), BlockStoreIdentityBackup(noE2e)).resolve(false, NoReshare)
-        assertFalse("without end-to-end encryption it stays on this phone", noE2e.items.getValue(BlockStoreIdentityBackup.KEY).backupToCloud)
+        LocalIdentity(
+            EncryptedRecordStore(folder.root.resolve("b"), TestBlobCipher()),
+            BlockStoreIdentityBackup(noE2e)
+        ).resolve(false, NoReshare)
+        assertFalse(
+            "without end-to-end encryption it stays on this phone",
+            noE2e.items.getValue(BlockStoreIdentityBackup.KEY).backupToCloud
+        )
     }
 
     @Test
@@ -81,7 +85,10 @@ class IdentitySyncTest {
         val reshare = RecordingReshare()
         val records = EncryptedRecordStore(folder.root.resolve("phone"), TestBlobCipher())
 
-        val state = LocalIdentity(records, BlockStoreIdentityBackup(blockStore)).resolve(accountHasIdentity = true, reshare = reshare)
+        val state = LocalIdentity(
+            records,
+            BlockStoreIdentityBackup(blockStore)
+        ).resolve(accountHasIdentity = true, reshare = reshare)
 
         assertEquals(LocalIdentity.State.WaitingForReshare, state)
         assertEquals("asked once", 1, reshare.requests)
