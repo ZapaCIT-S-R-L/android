@@ -28,6 +28,7 @@ include(":app")
 // once the tools ship the fixed version themselves.
 val securityFloors =
     mapOf(
+        "com.google.guava:guava" to "33.7.2-jre", // GHSA-xxph-c9ww-hj94
         "com.fasterxml.jackson.core:jackson-core" to "2.22.4", // GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89
         "com.fasterxml.jackson.core:jackson-databind" to "2.22.4", // GHSA-cxp5-3px4-pw24, GHSA-wv8q-qhhj-9h54
         "org.bouncycastle:bcprov-jdk18on" to "1.86", // GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26
