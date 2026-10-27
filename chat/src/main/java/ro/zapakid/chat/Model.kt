@@ -2,9 +2,11 @@ package ro.zapakid.chat
 
 import kotlinx.serialization.Serializable
 
-/** One phone in a conversation: account (token `sub`) and device (token `dev`). */
+/** One phone in a conversation: account (token `sub`) and libsignal device id (token `dev`, 1-127). */
 @Serializable
-data class ChatDevice(val account: String, val device: String)
+data class ChatDevice(val account: String, val device: Int) {
+    val id: String get() = "$account.$device"
+}
 
 enum class MessageKind { Text, Image, Voice }
 
