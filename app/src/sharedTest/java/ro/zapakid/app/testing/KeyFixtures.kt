@@ -23,14 +23,17 @@ class Phone(
     val account: String = "account-a"
 ) {
     val records = EncryptedRecordStore(dir, cipher)
+    val identityBackup = BlockStoreIdentityBackup(backup, account)
     val identity =
         (
             runBlocking {
-                LocalIdentity(records, BlockStoreIdentityBackup(backup, account)).resolve(false, NoReshare)
+                LocalIdentity(records, identityBackup).resolve(false, NoReshare)
             } as LocalIdentity.State.Ready
             )
             .identity
-    val store = ZapaKidProtocolStore(records, identity)
+
+    /** Trust changes go to Block Store with the identity, as the app wires it. */
+    val store = ZapaKidProtocolStore(records, identity) { peers -> runBlocking { identityBackup.savePeers(peers) } }
 
     fun reopen() = Phone(dir, cipher, backup, account)
 }
