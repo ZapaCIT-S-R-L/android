@@ -33,7 +33,7 @@ class HttpAuthApiTest {
            "ageRange":{"category":"adult","source":"google_play_age_signals","lowerBound":18,"upperBound":null,
            "platformStatus":"SHARED","checkedAt":"2026-10-26T10:00:00Z"},"createdAt":"2026-10-26T10:00:00Z"}"""
     private val signedIn =
-        """{"session":{"token":"zks_tok0000000000000000000000000000000000000000","expiresAt":"2026-11-26T10:00:00Z"},"parent":$parentJson,"newAccount":true}"""
+        """{"session":{"token":"$TOKEN","expiresAt":"2026-11-26T10:00:00Z"},"parent":$parentJson,"newAccount":true}"""
 
     @Before
     fun setUp() {
@@ -79,7 +79,7 @@ class HttpAuthApiTest {
                 ageRange = AgeRange.shared(lower = 18, upper = null, platformStatus = "SHARED")
             )
 
-        assertEquals("zks_tok0000000000000000000000000000000000000000", session.token)
+        assertEquals(TOKEN, session.token)
         assertEquals("2026-11-26T10:00:00Z", session.expiresAt)
         assertEquals(Parent("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11", "ana@example.com", "Ana Pop"), session.parent)
         val request = server.takeRequest()
@@ -129,7 +129,7 @@ class HttpAuthApiTest {
                 ageRange = AgeRange.unavailable(null)
             )
 
-        assertEquals("zks_tok0000000000000000000000000000000000000000", session.token)
+        assertEquals(TOKEN, session.token)
         val request = server.takeRequest()
         assertEquals("/v1/auth/apple/exchange", request.url.encodedPath)
         val sent = body(request.body!!.utf8())
@@ -211,7 +211,7 @@ class HttpAuthApiTest {
             )
         )
 
-        val e = expectError { api.me("zks_tok0000000000000000000000000000000000000000") }
+        val e = expectError { api.me(TOKEN) }
 
         assertEquals(502, e.status)
         assertEquals("http_502", e.code)
@@ -221,7 +221,7 @@ class HttpAuthApiTest {
     fun meSendsTheSessionAsABearerTokenAndReadsTheParent() = runTest {
         server.enqueue(MockResponse(code = 200, body = parentJson))
 
-        val parent = api.me("zks_tok0000000000000000000000000000000000000000")
+        val parent = api.me(TOKEN)
 
         assertEquals("Ana Pop", parent.displayName)
         val request = server.takeRequest()
@@ -234,7 +234,7 @@ class HttpAuthApiTest {
     fun logoutPostsWithTheBearerToken() = runTest {
         server.enqueue(MockResponse(code = 204, body = ""))
 
-        api.logout("zks_tok0000000000000000000000000000000000000000")
+        api.logout(TOKEN)
 
         val request = server.takeRequest()
         assertEquals("POST", request.method)
@@ -300,8 +300,8 @@ class HttpAuthApiTest {
 
         api.nonce()
         api.startAppleWeb("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
-        api.me("zks_tok0000000000000000000000000000000000000000")
-        api.logout("zks_tok0000000000000000000000000000000000000000")
+        api.me(TOKEN)
+        api.logout(TOKEN)
 
         repeat(4) { assertNull(server.takeRequest().headers["ZapaKid-Attestation"]) }
         assertEquals(emptyList<String>(), attestation.hashes)
@@ -328,3 +328,6 @@ class HttpAuthApiTest {
         assertEquals(false, e.isMinor)
     }
 }
+
+/** A session token in the contract's format (zks_ + 43 base64url characters). */
+private const val TOKEN = "zks_tok0000000000000000000000000000000000000000"
