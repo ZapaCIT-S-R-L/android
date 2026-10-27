@@ -13,7 +13,10 @@ class IncomingCallsTest {
         IncomingCalls(
             system = system,
             titles = { conversationId -> if (conversationId == "conv-1") ConversationTitle("Ana", 3, false) else null },
-            ring = { callId, conversationId, title -> rung += "$callId $conversationId ${title.name}"; true },
+            ring = { callId, conversationId, title ->
+                rung += "$callId $conversationId ${title.name}"
+                true
+            },
             cancel = { cancelled += it }
         )
 
