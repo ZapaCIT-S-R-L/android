@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -44,8 +45,7 @@ class DeviceRegistrationTest {
     private val cipher = TestBlobCipher()
 
     private fun registration(dir: String = "phone") = DeviceRegistration(
-        records = EncryptedRecordStore(folder.root.resolve(dir), cipher),
-        backup = BlockStoreIdentityBackup(blockStore),
+        accounts = AccountKeys(folder.root.resolve(dir), cipher, blockStore),
         api = api,
         session = { session },
         reshare = reshare,
@@ -88,7 +88,7 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.WaitingForReshare, registration().register())
         assertTrue(api.uploads.isEmpty())
         assertEquals(1, reshare.requests)
-        assertTrue("no keys made", EncryptedRecordStore(folder.root.resolve("phone"), cipher).list("prekey").isEmpty())
+        assertTrue("no keys made", AccountKeys(folder.root.resolve("phone"), cipher, blockStore).records(ANA.id).list("prekey").isEmpty())
     }
 
     @Test
@@ -97,7 +97,7 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.Failed(DeviceRegistration.Error.NETWORK), registration().register())
 
         assertEquals(DeviceRegistration.Result.Registered(2), registration().register())
-        val records = EncryptedRecordStore(folder.root.resolve("phone"), cipher)
+        val records = AccountKeys(folder.root.resolve("phone"), cipher, blockStore).records(ANA.id)
         assertEquals("keys made once", 3, records.list("prekey").size)
         assertTrue(records.get("signed-prekey", api.uploads.single().second.signedPreKey.keyId.toString()) != null)
     }
@@ -124,5 +124,30 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.Failed(DeviceRegistration.Error.SIGNED_OUT), registration().register())
         assertTrue(api.uploads.isEmpty())
         assertTrue(blockStore.items.isEmpty())
+    }
+
+    @Test
+    fun twoAccountsOnOnePhoneNeverShareKeysOrDeviceIds() = runTest {
+        val b = ANA.copy(id = "0b8d1e2a-9c3f-4d5e-8f60-112233445566", displayName = "Ben")
+        assertEquals(DeviceRegistration.Result.Registered(2), registration().register())
+
+        // A logs out, B signs in on the same phone.
+        session = Session("zks_tok0000000000000000000000000000000000000001", FAR_FUTURE, b)
+        assertEquals(DeviceRegistration.Result.Registered(2), registration().register())
+        assertEquals("B registered on its own", 2, api.uploads.size)
+        assertFalse("B never gets A's identity", api.uploads[0].second.identityKey == api.uploads[1].second.identityKey)
+
+        // A again: A's own device ID, no new upload.
+        session = Session("zks_tok0000000000000000000000000000000000000002", FAR_FUTURE, ANA)
+        assertEquals(DeviceRegistration.Result.Registered(2), registration().register())
+        assertEquals(2, api.uploads.size)
+    }
+
+    @Test
+    fun keyFilesDoNotNameTheAccount() = runTest {
+        registration().register()
+        val paths = folder.root.resolve("phone").walkTopDown().map { it.path }.toList()
+        assertTrue(paths.size > 1)
+        assertTrue(paths.none { it.contains(ANA.id) })
     }
 }

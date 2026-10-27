@@ -25,7 +25,7 @@ class IdentitySyncTest {
     private val blockStore = FakeBlockStore()
 
     private fun identityOn(dir: String, cipher: TestBlobCipher = TestBlobCipher()) =
-        LocalIdentity(EncryptedRecordStore(folder.root.resolve(dir), cipher), BlockStoreIdentityBackup(blockStore))
+        LocalIdentity(EncryptedRecordStore(folder.root.resolve(dir), cipher), BlockStoreIdentityBackup(blockStore, ACCOUNT))
 
     private fun LocalIdentity.State.ready() = (this as LocalIdentity.State.Ready).identity
 
@@ -37,24 +37,24 @@ class IdentitySyncTest {
 
         assertArrayEquals(first.keyPair.serialize(), again.keyPair.serialize())
         assertEquals(first.registrationId, again.registrationId)
-        assertEquals(setOf(BlockStoreIdentityBackup.KEY), blockStore.items.keys)
-        assertArrayEquals(first.keyPair.serialize(), blockStore.items.getValue(BlockStoreIdentityBackup.KEY).bytes)
+        assertEquals(setOf(BlockStoreIdentityBackup.keyFor(ACCOUNT)), blockStore.items.keys)
+        assertArrayEquals(first.keyPair.serialize(), BlockStoreIdentityBackup(blockStore, ACCOUNT).load())
         assertEquals("stored once", 1, blockStore.stores)
     }
 
     @Test
     fun itGoesToTheCloudOnlyWhenGoogleEncryptsItEndToEnd() = runTest {
         identityOn("a").resolve(false, NoReshare)
-        assertTrue(blockStore.items.getValue(BlockStoreIdentityBackup.KEY).backupToCloud)
+        assertTrue(blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(ACCOUNT)).backupToCloud)
 
         val noE2e = FakeBlockStore(endToEndEncryption = false)
         LocalIdentity(
             EncryptedRecordStore(folder.root.resolve("b"), TestBlobCipher()),
-            BlockStoreIdentityBackup(noE2e)
+            BlockStoreIdentityBackup(noE2e, ACCOUNT)
         ).resolve(false, NoReshare)
         assertFalse(
             "without end-to-end encryption it stays on this phone",
-            noE2e.items.getValue(BlockStoreIdentityBackup.KEY).backupToCloud
+            noE2e.items.getValue(BlockStoreIdentityBackup.keyFor(ACCOUNT)).backupToCloud
         )
     }
 
@@ -87,7 +87,7 @@ class IdentitySyncTest {
 
         val state = LocalIdentity(
             records,
-            BlockStoreIdentityBackup(blockStore)
+            BlockStoreIdentityBackup(blockStore, ACCOUNT)
         ).resolve(accountHasIdentity = true, reshare = reshare)
 
         assertEquals(LocalIdentity.State.WaitingForReshare, state)
@@ -104,17 +104,47 @@ class IdentitySyncTest {
 
         identityOn("phone", cipher).resolve(true, NoReshare)
 
-        assertArrayEquals(identity.keyPair.serialize(), blockStore.items.getValue(BlockStoreIdentityBackup.KEY).bytes)
+        assertArrayEquals(identity.keyPair.serialize(), BlockStoreIdentityBackup(blockStore, ACCOUNT).load())
     }
 
     @Test
     fun prekeysAndSessionsStayOnThePhone() = runTest {
         val records = EncryptedRecordStore(folder.root.resolve("phone"), TestBlobCipher())
-        val identity = LocalIdentity(records, BlockStoreIdentityBackup(blockStore)).resolve(false, NoReshare).ready()
+        val identity = LocalIdentity(records, BlockStoreIdentityBackup(blockStore, ACCOUNT)).resolve(false, NoReshare).ready()
         DeviceKeyGenerator(identity, ZapaKidProtocolStore(records, identity)).generate(oneTimeCount = 2)
 
-        assertEquals(setOf(BlockStoreIdentityBackup.KEY), blockStore.items.keys)
+        assertEquals(setOf(BlockStoreIdentityBackup.keyFor(ACCOUNT)), blockStore.items.keys)
         assertFalse(records.list("prekey").isEmpty())
         assertFalse(records.list("kyber-last-resort").isEmpty())
+    }
+
+    @Test
+    fun eachAccountHasItsOwnBlockStoreItemAndNeverGetsAnotherAccountsIdentity() = runTest {
+        val a = LocalIdentity(EncryptedRecordStore(folder.root.resolve("a"), TestBlobCipher()), BlockStoreIdentityBackup(blockStore, ACCOUNT))
+            .resolve(false, NoReshare).ready()
+        val b = LocalIdentity(EncryptedRecordStore(folder.root.resolve("b"), TestBlobCipher()), BlockStoreIdentityBackup(blockStore, OTHER))
+            .resolve(false, NoReshare).ready()
+
+        assertFalse(a.keyPair.serialize().contentEquals(b.keyPair.serialize()))
+        assertEquals(setOf(BlockStoreIdentityBackup.keyFor(ACCOUNT), BlockStoreIdentityBackup.keyFor(OTHER)), blockStore.items.keys)
+    }
+
+    @Test
+    fun aBlockStoreItemThatNamesAnotherAccountIsNeverUsed() = runTest {
+        BlockStoreIdentityBackup(blockStore, ACCOUNT).save(org.signal.libsignal.protocol.IdentityKeyPair.generate().serialize())
+        // The other account's slot holds a copy of this account's blob (tampered or migrated).
+        blockStore.items[BlockStoreIdentityBackup.keyFor(OTHER)] = blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(ACCOUNT))
+
+        assertEquals(null, BlockStoreIdentityBackup(blockStore, OTHER).load())
+        val reshare = RecordingReshare()
+        val state =
+            LocalIdentity(EncryptedRecordStore(folder.root.resolve("b"), TestBlobCipher()), BlockStoreIdentityBackup(blockStore, OTHER))
+                .resolve(accountHasIdentity = true, reshare = reshare)
+        assertEquals(LocalIdentity.State.WaitingForReshare, state)
+    }
+
+    private companion object {
+        const val ACCOUNT = "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+        const val OTHER = "0b8d1e2a-9c3f-4d5e-8f60-112233445566"
     }
 }

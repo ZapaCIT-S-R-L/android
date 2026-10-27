@@ -19,19 +19,20 @@ import ro.zapakid.app.keys.ZapaKidProtocolStore
 class Phone(
     val dir: File,
     val cipher: TestBlobCipher = TestBlobCipher(),
-    val backup: FakeBlockStore = FakeBlockStore()
+    val backup: FakeBlockStore = FakeBlockStore(),
+    val account: String = "account-a"
 ) {
     val records = EncryptedRecordStore(dir, cipher)
     val identity =
         (
             runBlocking {
-                LocalIdentity(records, BlockStoreIdentityBackup(backup)).resolve(false, NoReshare)
+                LocalIdentity(records, BlockStoreIdentityBackup(backup, account)).resolve(false, NoReshare)
             } as LocalIdentity.State.Ready
             )
             .identity
     val store = ZapaKidProtocolStore(records, identity)
 
-    fun reopen() = Phone(dir, cipher, backup)
+    fun reopen() = Phone(dir, cipher, backup, account)
 }
 
 /** Block Store on the JVM: a map, and whether Google's end-to-end encrypted cloud backup is available. */
