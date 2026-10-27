@@ -1,5 +1,7 @@
 package ro.zapakid.calls.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalDensity
@@ -18,8 +20,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.material3.MaterialTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -133,7 +133,9 @@ class CallScreenTest {
             .onNodeWithTag(CallTags.MUTE)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "On"))
             .performClick()
-        compose.onNodeWithTag(CallTags.MUTE).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Off"))
+        compose.onNodeWithTag(
+            CallTags.MUTE
+        ).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Off"))
         assertTrue(engine.isMuted)
 
         compose.onNodeWithTag(CallTags.END).performClick()
