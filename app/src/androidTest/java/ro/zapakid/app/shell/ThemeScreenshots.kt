@@ -103,7 +103,8 @@ class ThemeScreenshots {
     private fun save(bitmap: Bitmap, name: String) {
         // AGP pulls additionalTestOutputDir into build/outputs/connected_android_test_additional_output.
         val pulled = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
-        val dir = pulled ?: File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screens")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dir = pulled ?: File(context.getExternalFilesDir(null), "screens")
         dir.mkdirs()
         File(dir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
