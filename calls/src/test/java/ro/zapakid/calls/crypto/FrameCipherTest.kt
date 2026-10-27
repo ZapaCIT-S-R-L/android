@@ -1,19 +1,21 @@
 package ro.zapakid.calls.crypto
 
+import java.security.SecureRandom
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import java.security.SecureRandom
 
 /** AES-GCM frame encryption: the frame layout every engine (fake and WebRTC) uses. */
 class FrameCipherTest {
     private val random = SecureRandom()
     private val opusFrame = byteArrayOf(0x78, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
 
-    private fun ringWith(vararg epochs: Int): KeyRing = KeyRing().apply { epochs.forEach { install(CallKey.random(it, random)) } }
+    private fun ringWith(vararg epochs: Int): KeyRing = KeyRing().apply {
+        epochs.forEach { install(CallKey.random(it, random)) }
+    }
 
     @Test
     fun roundTripRestoresTheFrame() {
@@ -89,7 +91,9 @@ class FrameCipherTest {
 
     @Test
     fun aSenderWithoutAKeyRefusesToSendClearAudio() {
-        assertThrows(IllegalStateException::class.java) { FrameCipher.Sender(ssrc = 42, ring = KeyRing()).encrypt(opusFrame) }
+        assertThrows(IllegalStateException::class.java) {
+            FrameCipher.Sender(ssrc = 42, ring = KeyRing()).encrypt(opusFrame)
+        }
     }
 
     @Test

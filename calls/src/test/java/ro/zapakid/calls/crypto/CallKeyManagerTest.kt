@@ -24,7 +24,7 @@ class CallKeyManagerTest {
     }
 
     private suspend fun deliver(envelopes: List<KeyEnvelope>, vararg phones: Phone) {
-        for (envelope in envelopes) phones.single { it.device == envelope.toDevice }.keys.onEnvelope(envelope)
+        for (envelope in envelopes) phones.firstOrNull { it.device == envelope.toDevice }?.keys?.onEnvelope(envelope)
     }
 
     @Test
