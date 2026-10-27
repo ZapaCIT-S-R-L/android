@@ -13,6 +13,9 @@ import org.signal.libsignal.protocol.SessionBuilder
 import org.signal.libsignal.protocol.SessionCipher
 import org.signal.libsignal.protocol.message.PreKeySignalMessage
 import ro.zapakid.app.auth.KeystoreBlobCipher
+import kotlinx.coroutines.runBlocking
+import ro.zapakid.app.testing.FakeBlockStore
+import ro.zapakid.app.testing.NoReshare
 import ro.zapakid.app.testing.address
 import ro.zapakid.app.testing.asBundle
 
@@ -32,7 +35,9 @@ class KeySetupDeviceTest {
 
     private fun open(i: Int): Pair<LocalIdentity.Identity, ZapaKidProtocolStore> {
         val records = EncryptedRecordStore(dirs[i], KeystoreBlobCipher(aliases[i]))
-        val identity = LocalIdentity(records).getOrCreate()
+        val identity =
+            (runBlocking { LocalIdentity(records, BlockStoreIdentityBackup(FakeBlockStore())).resolve(false, NoReshare) } as LocalIdentity.State.Ready)
+                .identity
         return identity to ZapaKidProtocolStore(records, identity)
     }
 
