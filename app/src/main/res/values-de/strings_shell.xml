@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_chats">Chats</string>
+    <string name="tab_calls">Anrufe</string>
+    <string name="tab_family">Familie</string>
+    <string name="setting_up">Sicherer Chat wird auf diesem Handy vorbereitet… Es klappt, sobald die Familienschlüssel eingerichtet sind.</string>
+</resources>

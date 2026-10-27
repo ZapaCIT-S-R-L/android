@@ -79,4 +79,49 @@ class AppGraph(
     val kidSessionStore: KidSessionStore by lazy {
         kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreSessionCipher())
     }
+
+    /** Chat tokens for chat and calls, from the parent session or, on a kid phone, the kid session. */
+    val chatTokens: ro.zapakid.app.shell.ChatTokenClient by lazy {
+        ro.zapakid.app.shell.ChatTokenClient(BuildConfig.API_BASE_URL.toHttpUrl(), http, session = {
+            authRepository.token() ?: kidSessionStore.load()?.token
+        })
+    }
+
+    val callLog: ro.zapakid.calls.CallLog by lazy { ro.zapakid.calls.InMemoryCallLog() }
+
+    val shell: ro.zapakid.app.shell.ShellDeps by lazy {
+        ro.zapakid.app.shell.ShellDeps(
+            http = http,
+            chatUrl = BuildConfig.CHAT_BASE_URL.toHttpUrl(),
+            callsUrl = BuildConfig.CALLS_BASE_URL.toHttpUrl(),
+            tokens = chatTokens,
+            // The libsignal sealers are wired here once the key-setup PRs land (android #12, #17).
+            sealers = ro.zapakid.app.shell.SealerSource.None,
+            store = {
+                ro.zapakid.chat.data.SqlCipherChatStore(
+                    app,
+                    ro.zapakid.chat.data.DatabaseKey.load(
+                        File(app.noBackupFilesDir, "chat-db.key"),
+                        KeystoreKeyWrapper()
+                    )
+                )
+            },
+            engine = {
+                ro.zapakid.calls.engine.WebRtcCallEngine(
+                    app,
+                    ro.zapakid.calls.api.HttpCallsApi(BuildConfig.CALLS_BASE_URL.toHttpUrl(), http, chatTokens)
+                )
+            },
+            callLog = callLog
+        )
+    }
+}
+
+/** The Keystore cipher of the session store, wrapping the chat database key. */
+private class KeystoreKeyWrapper : ro.zapakid.chat.data.KeyWrapper {
+    private val cipher = KeystoreSessionCipher()
+
+    override fun wrap(plain: ByteArray) = cipher.encrypt(plain)
+
+    override fun unwrap(wrapped: ByteArray) = cipher.decrypt(wrapped)
 }

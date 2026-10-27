@@ -42,7 +42,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ZapaKidTheme {
-                ZapaKidApp(authViewModel, google = google, apple = apple, family = familyViewModel, kid = kidViewModel)
+                ZapaKidApp(
+                    authViewModel,
+                    google = google,
+                    apple = apple,
+                    family = familyViewModel,
+                    kid = kidViewModel,
+                    shell = graph.shell
+                )
             }
         }
     }

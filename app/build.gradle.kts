@@ -34,6 +34,8 @@ android {
 
         // Public identifiers, not secrets. Override with -P or ~/.gradle/gradle.properties; empty = not set up.
         buildConfigField("String", "API_BASE_URL", "\"https://api-staging.zapakid.ro/v1/\"")
+        buildConfigField("String", "CHAT_BASE_URL", "\"https://chat-staging.zapakid.ro/v1/\"")
+        buildConfigField("String", "CALLS_BASE_URL", "\"https://calls-staging.zapakid.ro/v1/\"")
         // The OAuth web (server) client the API checks the token audience against. The Android OAuth client
         // (package ro.zapakid.app + signing SHA-1) is registered in Google Cloud; it isn't referenced in code.
         buildConfigField(
@@ -121,6 +123,7 @@ ktlint {
 
 dependencies {
     implementation(project(":calls"))
+    implementation(project(":chat"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -156,3 +159,15 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 }
+
+// Release bundles (what goes to Play) must carry the real, libsignal-backed sealers: never none, never a fake.
+// test/sealers.test.js keeps fakes in the test source sets; this stops a bundle without the real one.
+val checkRealSealers by tasks.registering {
+    val sealers = fileTree("src/main/java") { include("**/Libsignal*Sealer*.kt") }
+    doLast {
+        check(!sealers.isEmpty) {
+            "No libsignal sealer in app/src/main: chat and calls can't ship without end-to-end keys (Libsignal*Sealer*.kt)."
+        }
+    }
+}
+tasks.matching { it.name == "bundleRelease" }.configureEach { dependsOn(checkRealSealers) }

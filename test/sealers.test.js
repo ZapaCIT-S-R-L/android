@@ -30,3 +30,10 @@ test("the shared test fakes are not part of any shipped source set", () => {
     }
   }
 });
+
+test("a release bundle without the libsignal sealers fails to build", () => {
+  const app = readFileSync("app/build.gradle.kts", "utf8");
+  assert.match(app, /val checkRealSealers by tasks\.registering/);
+  assert.match(app, /include\("\*\*\/Libsignal\*Sealer\*\.kt"\)/);
+  assert.match(app, /it\.name == "bundleRelease" \}\.configureEach \{ dependsOn\(checkRealSealers\) \}/);
+});

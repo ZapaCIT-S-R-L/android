@@ -1,5 +1,7 @@
 package ro.zapakid.app.shell
 
+import java.time.Instant
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -8,8 +10,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
-import java.util.Base64
 
 /** Chat tokens from the account service, cached until a minute before expiry. */
 class ChatTokenClientTest {
@@ -23,7 +23,8 @@ class ChatTokenClientTest {
         return "${b64.encodeToString("{}".toByteArray())}.${b64.encodeToString(claims.toByteArray())}.sig"
     }
 
-    private fun enqueue(n: Int, expires: String) = server.enqueue(MockResponse(code = 200, body = """{"token":"${jwt(n)}","expiresAt":"$expires"}"""))
+    private fun enqueue(n: Int, expires: String) =
+        server.enqueue(MockResponse(code = 200, body = """{"token":"${jwt(n)}","expiresAt":"$expires"}"""))
 
     @Before
     fun setUp() {

@@ -36,7 +36,9 @@ class AppShellTest {
 
     private fun show(kid: Boolean, call: CallUiState = CallUiState()) = compose.setContent {
         MaterialTheme {
-            AppShell(kid, call, noCall, chats = { Text("CHATS") }, calls = { Text("CALLS") }, family = { Text("FAMILY") })
+            AppShell(kid, call, noCall, chats = {
+                Text("CHATS")
+            }, calls = { Text("CALLS") }, family = { Text("FAMILY") })
         }
     }
 
