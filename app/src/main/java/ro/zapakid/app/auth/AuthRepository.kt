@@ -48,6 +48,9 @@ class AuthRepository(
     /** The parent of a stored, unexpired session, without a network call. */
     fun current(): Parent? = validSession()?.parent
 
+    /** The stored, unexpired session token, for the account API calls (families). Never logged. */
+    fun token(): String? = validSession()?.token
+
     /** Google: Credential Manager sheet with SHA-256(nonce), then POST /v1/auth/google. */
     suspend fun signInWithGoogle(sheet: IdTokenProvider): SignInResult = signIn { nonce, age ->
         val token = sheet.signIn(Nonces.providerNonce(nonce))

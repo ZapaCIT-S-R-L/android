@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="family_title">Familia mea</string>
+    <string name="family_parents">Părinți</string>
+    <string name="family_parent">Părinte</string>
+    <string name="family_invite_parent">Invită celălalt părinte</string>
+    <string name="family_kids">Copii</string>
+    <string name="family_no_kids">Niciun copil încă. Adaugă primul copil!</string>
+    <string name="family_add_kid">Adaugă un copil</string>
+    <string name="family_save_kid">Adaugă</string>
+    <string name="family_cancel">Anulează</string>
+    <string name="family_done">Gata</string>
+    <string name="family_nickname">Poreclă</string>
+    <string name="family_nickname_hint">Doar o poreclă, fără numele real.</string>
+    <string name="family_pick_robot">Alege un robot</string>
+    <string name="family_robot_n">Robotul %1$d</string>
+    <string name="family_grade">Clasa</string>
+    <string name="family_pair_phone">Leagă telefonul</string>
+    <string name="family_pair_title">Leagă telefonul lui %1$s</string>
+    <string name="family_pair_body">Pe telefonul copilului, deschide ZapaKid, apasă „Este telefonul unui copil” și scanează acest cod. Merge o singură dată, timp de 5 minute.</string>
+    <string name="family_invite_title">Invită celălalt părinte</string>
+    <string name="family_invite_body">Celălalt părinte intră în ZapaKid și scanează acest cod. Merge o singură dată, timp de 3 zile.</string>
+    <string name="family_error_network">Nu există conexiune. Verifică internetul și încearcă din nou.</string>
+    <string name="family_error_too_many">Prea multe coduri deschise. Așteaptă să fie folosit sau să expire unul.</string>
+    <string name="family_error_invalid_code">Codul nu mai merge. Cere unul nou.</string>
+    <string name="family_error_already">Ai deja o familie cu copii sau cu alt părinte.</string>
+    <string name="family_error_too_many_kids">O familie poate avea cel mult 12 copii.</string>
+    <string name="family_error_server">Ceva n-a mers. Încearcă din nou puțin mai târziu.</string>
+    <string name="grade_not_set">Fără clasă</string>
+    <string name="grade_kindergarten">Grădiniță</string>
+    <string name="grade_preparatory">Clasa pregătitoare</string>
+    <string name="grade_n">Clasa a %1$d-a</string>
+    <string name="kid_phone">Este telefonul unui copil</string>
+    <string name="kid_pair_title">Salut! Hai să-ți conectăm telefonul</string>
+    <string name="kid_pair_body">Roagă-ți mama sau tata să-ți arate codul QR din ZapaKid, apoi apasă butonul.</string>
+    <string name="kid_pair_scan">Scanează codul</string>
+    <string name="kid_pair_working">Se conectează…</string>
+    <string name="kid_pair_done">Telefonul tău e conectat la familie!</string>
+    <string name="kid_pair_hello">Salut, %1$s!</string>
+    <string name="kid_pair_try_again">Încearcă din nou</string>
+    <string name="kid_pair_back">Înapoi</string>
+</resources>

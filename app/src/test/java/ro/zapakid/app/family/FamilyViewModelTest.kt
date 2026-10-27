@@ -28,7 +28,10 @@ class FamilyViewModelTest {
 
         override suspend fun families(token: String) = listOf(family)
 
-        override suspend fun inviteParent(token: String, familyId: String) = OneTimeCode(inviteCode, "x").also { calls += "invite" }
+        override suspend fun inviteParent(token: String, familyId: String) = OneTimeCode(inviteCode, "x").also {
+            calls +=
+                "invite"
+        }
 
         override suspend fun join(token: String, code: String) = family.also { calls += "join $code" }
 
@@ -41,7 +44,11 @@ class FamilyViewModelTest {
         override suspend fun redeem(code: String): PairedKid {
             redeemError?.let { throw it }
             calls += "redeem $code"
-            return PairedKid(KidSessionToken("zkk_tok", "2027-10-27T00:00:00Z"), Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1", "Pop"))
+            return PairedKid(
+                KidSessionToken("zkk_tok", "2027-10-27T00:00:00Z"),
+                Kid("k1", "Mia", "robot-3", 2),
+                FamilyRef("f1", "Pop")
+            )
         }
     }
 
@@ -130,7 +137,9 @@ class FamilyViewModelTest {
 
     @Test
     fun aPairedPhoneStartsPaired() {
-        val store = MemoryKidStore().apply { save(KidSession("zkk", "x", Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1"))) }
+        val store = MemoryKidStore().apply {
+            save(KidSession("zkk", "x", Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1")))
+        }
 
         assertTrue(KidPairingViewModel(api, store) { null }.state.value is KidPairingState.Paired)
     }

@@ -72,7 +72,9 @@ class HttpFamilyApiTest {
 
     @Test
     fun invitingASecondParentAndJoining() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"code":"zki_${"b".repeat(43)}","expiresAt":"2026-10-30T10:00:00Z"}"""))
+        server.enqueue(
+            MockResponse(code = 201, body = """{"code":"zki_${"b".repeat(43)}","expiresAt":"2026-10-30T10:00:00Z"}""")
+        )
         server.enqueue(MockResponse(code = 200, body = familyJson))
 
         val invitation = api.inviteParent("zks_tok", "f1")
@@ -81,12 +83,20 @@ class HttpFamilyApiTest {
         assertEquals("/v1/families/f1/parents/invitations", sent().url.encodedPath)
         val join = sent()
         assertEquals("/v1/families/join", join.url.encodedPath)
-        assertEquals(invitation.code, Json.parseToJsonElement(join.body!!.utf8()).jsonObject["code"]!!.jsonPrimitive.content)
+        assertEquals(
+            invitation.code,
+            Json.parseToJsonElement(join.body!!.utf8()).jsonObject["code"]!!.jsonPrimitive.content
+        )
     }
 
     @Test
     fun addingAKidSendsNicknameAvatarAndGrade() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"id":"k2","nickname":"Ion","avatar":"robot-1","grade":null,"createdAt":"x"}"""))
+        server.enqueue(
+            MockResponse(
+                code = 201,
+                body = """{"id":"k2","nickname":"Ion","avatar":"robot-1","grade":null,"createdAt":"x"}"""
+            )
+        )
 
         api.addKid("zks_tok", "f1", "  Ion ", Avatars.id(1), null)
 
@@ -98,7 +108,12 @@ class HttpFamilyApiTest {
 
     @Test
     fun kindergartenIsGradeMinusOne() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"id":"k2","nickname":"Ion","avatar":"robot-1","grade":-1,"createdAt":"x"}"""))
+        server.enqueue(
+            MockResponse(
+                code = 201,
+                body = """{"id":"k2","nickname":"Ion","avatar":"robot-1","grade":-1,"createdAt":"x"}"""
+            )
+        )
 
         api.addKid("zks_tok", "f1", "Ion", "robot-1", -1)
 
@@ -107,11 +122,14 @@ class HttpFamilyApiTest {
 
     @Test
     fun pairingCodeAndRedeemWithAttestationButNoSession() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"code":"$code","expiresAt":"x","kid":{"id":"k1","nickname":"Mia","avatar":"robot-3","grade":2,"createdAt":"x"}}"""))
+        val kid = """{"id":"k1","nickname":"Mia","avatar":"robot-3","grade":2,"createdAt":"x"}"""
+        val kidToken = "zkk_" + "c".repeat(43)
+        val family = """{"id":"f1","name":"Pop"}"""
+        server.enqueue(MockResponse(code = 201, body = """{"code":"$code","expiresAt":"x","kid":$kid}"""))
         server.enqueue(
             MockResponse(
                 code = 200,
-                body = """{"session":{"token":"zkk_${"c".repeat(43)}","expiresAt":"x"},"kid":{"id":"k1","nickname":"Mia","avatar":"robot-3","grade":2,"createdAt":"x"},"family":{"id":"f1","name":"Pop"}}"""
+                body = """{"session":{"token":"$kidToken","expiresAt":"x"},"kid":$kid,"family":$family}"""
             )
         )
 
@@ -130,7 +148,9 @@ class HttpFamilyApiTest {
 
     @Test
     fun anUsedPairingCodeIsAClearError() = runTest {
-        server.enqueue(MockResponse(code = 410, body = """{"error":{"code":"pairing_code_invalid","message":"Ask a parent"}}"""))
+        server.enqueue(
+            MockResponse(code = 410, body = """{"error":{"code":"pairing_code_invalid","message":"Ask a parent"}}""")
+        )
 
         try {
             api.redeem(code)

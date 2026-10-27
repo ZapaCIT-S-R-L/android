@@ -20,6 +20,10 @@ import ro.zapakid.app.auth.PlayIntegrityAttestation
 import ro.zapakid.app.auth.SessionStore
 import ro.zapakid.app.auth.Tls
 import ro.zapakid.app.auth.signin.AppleSignInConfig
+import ro.zapakid.app.family.EncryptedKidSessionStore
+import ro.zapakid.app.family.FamilyApi
+import ro.zapakid.app.family.HttpFamilyApi
+import ro.zapakid.app.family.KidSessionStore
 
 /** Production wiring. Emulator tests pass fakes for the network, storage, age signal and Custom Tab. */
 class AppGraph(
@@ -27,6 +31,8 @@ class AppGraph(
     api: AuthApi? = null,
     store: SessionStore? = null,
     ageSignals: AgeSignalsSource? = null,
+    familyApi: FamilyApi? = null,
+    kidStore: KidSessionStore? = null,
     /** Opens Apple's authorize page. A Custom Tab in the app; tests replace the browser. */
     val openCustomTab: (
         Activity,
@@ -59,5 +65,18 @@ class AppGraph(
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
             appleConfig = appleConfig
         )
+    }
+
+    val familyApi: FamilyApi by lazy {
+        familyApi ?: HttpFamilyApi(
+            BuildConfig.API_BASE_URL.toHttpUrl(),
+            http,
+            PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+        )
+    }
+
+    /** A paired kid phone's session, encrypted like the parent session. */
+    val kidSessionStore: KidSessionStore by lazy {
+        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreSessionCipher())
     }
 }

@@ -133,6 +133,8 @@ dependencies {
     implementation(libs.libsignal.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.browser)
+    implementation(libs.zxing.core)
+    implementation(libs.play.code.scanner)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
