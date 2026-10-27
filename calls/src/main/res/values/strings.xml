@@ -21,7 +21,6 @@
     <string name="call_ended_connection">The connection was lost</string>
     <string name="call_ended_failed">The call didn\'t work. Try again.</string>
     <string name="call_close">Close</string>
-    <string name="call_back">Call back</string>
     <!-- Buttons (also read by TalkBack) -->
     <string name="call_accept">Answer</string>
     <string name="call_decline">Decline</string>
@@ -31,7 +30,6 @@
     <string name="call_on">On</string>
     <string name="call_off">Off</string>
     <string name="call_speaking">talking</string>
-    <string name="call_you">You</string>
     <!-- Call log -->
     <string name="call_log_title">Calls</string>
     <string name="call_log_empty">No calls yet. Call someone from your family!</string>

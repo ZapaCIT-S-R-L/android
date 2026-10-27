@@ -20,7 +20,6 @@
     <string name="call_ended_connection">S-a pierdut legătura</string>
     <string name="call_ended_failed">Apelul nu a mers. Încearcă din nou.</string>
     <string name="call_close">Închide</string>
-    <string name="call_back">Sună înapoi</string>
     <string name="call_accept">Răspunde</string>
     <string name="call_decline">Respinge</string>
     <string name="call_end">Închide apelul</string>
@@ -29,7 +28,6 @@
     <string name="call_on">Pornit</string>
     <string name="call_off">Oprit</string>
     <string name="call_speaking">vorbește</string>
-    <string name="call_you">Tu</string>
     <string name="call_log_title">Apeluri</string>
     <string name="call_log_empty">Niciun apel încă. Sună pe cineva din familie!</string>
     <string name="call_log_missed">Pierdut</string>

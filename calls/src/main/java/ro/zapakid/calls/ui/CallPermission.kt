@@ -24,8 +24,19 @@ import androidx.compose.ui.unit.dp
 import ro.zapakid.calls.R
 
 /** A permission calls need, with the kid-friendly words shown before the system dialog. */
-enum class CallPermission(val permission: String, @StringRes val title: Int, @StringRes val body: Int) {
-    Microphone(Manifest.permission.RECORD_AUDIO, R.string.permission_mic_title, R.string.permission_mic_body),
+enum class CallPermission(
+    val permission: String,
+    @StringRes val title: Int,
+    @StringRes val body: Int,
+    /** Shown when the permission was refused: what stops working, and where to turn it on. */
+    @StringRes val denied: Int? = null
+) {
+    Microphone(
+        Manifest.permission.RECORD_AUDIO,
+        R.string.permission_mic_title,
+        R.string.permission_mic_body,
+        R.string.permission_mic_denied
+    ),
     Notifications(
         "android.permission.POST_NOTIFICATIONS",
         R.string.permission_notifications_title,

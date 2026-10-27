@@ -19,7 +19,6 @@
     <string name="call_ended_connection">Die Verbindung ist abgebrochen</string>
     <string name="call_ended_failed">Der Anruf hat nicht geklappt. Versuch es nochmal.</string>
     <string name="call_close">Schließen</string>
-    <string name="call_back">Zurückrufen</string>
     <string name="call_accept">Annehmen</string>
     <string name="call_decline">Ablehnen</string>
     <string name="call_end">Auflegen</string>
@@ -28,7 +27,6 @@
     <string name="call_on">An</string>
     <string name="call_off">Aus</string>
     <string name="call_speaking">spricht</string>
-    <string name="call_you">Du</string>
     <string name="call_log_title">Anrufe</string>
     <string name="call_log_empty">Noch keine Anrufe. Ruf jemanden aus deiner Familie an!</string>
     <string name="call_log_missed">Verpasst</string>
