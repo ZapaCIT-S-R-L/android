@@ -52,7 +52,8 @@ fun RobotAvatar(
     size: Dp,
     modifier: Modifier = Modifier,
     speaking: Boolean = false,
-    ringing: Boolean = false
+    ringing: Boolean = false,
+    sparkles: Boolean = false
 ) {
     val color = RobotAvatars.colors[Math.floorMod(index, RobotAvatars.COUNT)]
     val transition = rememberInfiniteTransition(label = "avatar")
@@ -77,6 +78,7 @@ fun RobotAvatar(
             }
             drawCircle(color, radius = radius)
             robotFace(radius)
+            if (sparkles) sparkles(radius, color)
         }
     }
 }
@@ -110,4 +112,15 @@ private fun DrawScope.robotFace(radius: Float) {
         size = Size(headW * 0.44f, headH * 0.32f),
         style = Stroke(radius * 0.06f)
     )
+}
+
+/** Small four-point sparkles around the robot: the kids' look. */
+private fun DrawScope.sparkles(radius: Float, color: Color) {
+    val spots = listOf(Offset(-1.15f, -0.9f) to 0.16f, Offset(1.1f, -1.05f) to 0.12f, Offset(1.2f, 0.75f) to 0.1f)
+    for ((spot, scale) in spots) {
+        val c = center + Offset(spot.x * radius, spot.y * radius)
+        val r = radius * scale
+        drawLine(color, Offset(c.x - r, c.y), Offset(c.x + r, c.y), strokeWidth = r / 3)
+        drawLine(color, Offset(c.x, c.y - r), Offset(c.x, c.y + r), strokeWidth = r / 3)
+    }
 }

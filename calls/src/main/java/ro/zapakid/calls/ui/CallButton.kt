@@ -37,6 +37,10 @@ import ro.zapakid.calls.R
 internal val AcceptGreen = Color(0xFF1FA463)
 internal val EndRed = Color(0xFFE5383B)
 internal val BigButton = 84.dp
+internal val KidButton = 96.dp
+
+@Composable
+internal fun buttonSize() = if (LocalUserRole.current.playful) KidButton else BigButton
 
 /** A big round button with its label under it; one haptic tick per press. */
 @Composable
@@ -52,7 +56,7 @@ internal fun RoundButton(
     Column(
         modifier =
             modifier
-                .widthIn(min = BigButton)
+                .widthIn(min = buttonSize())
                 .testTag(tag)
                 .clearAndSetSemantics {
                     contentDescription = label
@@ -69,7 +73,7 @@ internal fun RoundButton(
         Box(
             modifier =
                 Modifier
-                    .size(BigButton)
+                    .size(buttonSize())
                     .clip(CircleShape)
                     .background(color)
                     .tap {
@@ -101,7 +105,7 @@ internal fun ToggleButton(
     Column(
         modifier =
             modifier
-                .widthIn(min = BigButton)
+                .widthIn(min = buttonSize())
                 .testTag(tag)
                 .toggleable(value = on, role = Role.Switch) {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -113,7 +117,7 @@ internal fun ToggleButton(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(Modifier.size(BigButton).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(buttonSize()).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
             Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(36.dp))
         }
         Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)

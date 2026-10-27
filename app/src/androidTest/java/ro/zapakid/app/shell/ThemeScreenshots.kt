@@ -9,6 +9,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
 import ro.zapakid.app.family.Family
@@ -31,7 +32,6 @@ import ro.zapakid.chat.MessageStatus
 import ro.zapakid.chat.ui.ChatActions
 import ro.zapakid.chat.ui.ChatScreen
 import ro.zapakid.chat.ui.ConversationListScreen
-import java.io.File
 
 /**
  * Renders the four main screens in both looks and saves PNGs on the device
@@ -50,7 +50,7 @@ class ThemeScreenshots {
         )
     private val messages =
         listOf(
-            Message("m1", "c1", "mum", false, MessageKind.Text, "Hi sweetie! How was school?", null, 1, MessageStatus.Received),
+            Message("m1", "c1", "mum", false, MessageKind.Text, "Hi! How was school?", null, 1, MessageStatus.Received),
             Message("m2", "c1", "me", true, MessageKind.Text, "Great! We built a robot", null, 2, MessageStatus.Sent),
             Message("m3", "c1", "mum", false, MessageKind.Text, "Wow! Show me tonight", null, 3, MessageStatus.Received)
         )

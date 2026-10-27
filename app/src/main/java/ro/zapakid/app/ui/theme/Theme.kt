@@ -1,35 +1,19 @@
 package ro.zapakid.app.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import ro.zapakid.app.family.KidPairingState
+import ro.zapakid.calls.ui.UserRole
+import ro.zapakid.calls.ui.ZapaTheme
 
-private val Blue = Color(0xFF1E6FD9)
-private val BlueLight = Color(0xFF9CC3FF)
+/** A paired kid phone gets the playful look; everyone else (parents, sign-in) the calm one. */
+fun roleFor(kidState: KidPairingState?): UserRole =
+    if (kidState is KidPairingState.Paired) UserRole.Kid else UserRole.Parent
 
-private val LightColors = lightColorScheme(primary = Blue)
-private val DarkColors = darkColorScheme(primary = BlueLight)
-
-/** App theme: Material 3, dynamic colour on Android 12+, light and dark. Text sizes follow the system font scale. */
+/** App theme: the role's colours, type and shapes, light and dark. Text sizes follow the system font scale. */
 @Composable
-fun ZapaKidTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors =
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                val context = LocalContext.current
-                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }
-
-            darkTheme -> DarkColors
-
-            else -> LightColors
-        }
-    MaterialTheme(colorScheme = colors, content = content)
-}
+fun ZapaKidTheme(
+    role: UserRole = UserRole.Parent,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) = ZapaTheme(role, darkTheme, content)

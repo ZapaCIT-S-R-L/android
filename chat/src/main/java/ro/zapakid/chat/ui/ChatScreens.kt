@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,7 +46,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ro.zapakid.calls.ui.LocalUserRole
 import ro.zapakid.calls.ui.RobotAvatar
+import ro.zapakid.calls.ui.playful
 import ro.zapakid.chat.Conversation
 import ro.zapakid.chat.Message
 import ro.zapakid.chat.MessageKind
@@ -83,13 +86,29 @@ fun ConversationListScreen(conversations: List<Conversation>, onOpen: (Conversat
                 )
             }
             LazyColumn(Modifier.testTag(ChatTags.LIST)) {
-                items(conversations, key = { it.id }) { c ->
+                itemsIndexed(conversations, key = { _, c -> c.id }) { index, c ->
+                    val playful = LocalUserRole.current.playful
+                    val card =
+                        if (playful) {
+                            Modifier
+                                .padding(vertical = 6.dp)
+                                .shadow(3.dp, MaterialTheme.shapes.large)
+                                .background(kidCardColors()[index % KID_CARDS], MaterialTheme.shapes.large)
+                                .padding(12.dp)
+                        } else {
+                            Modifier
+                        }
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable { onOpen(c) }.testTag(ChatTags.ROW),
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = if (playful) 88.dp else 72.dp)
+                            .clickable { onOpen(c) }
+                            .then(card)
+                            .testTag(ChatTags.ROW),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        RobotAvatar(index = c.avatar, size = 48.dp)
+                        RobotAvatar(index = c.avatar, size = if (playful) 56.dp else 48.dp, sparkles = playful)
                         Column(Modifier.weight(1f)) {
                             Text(
                                 c.title,
@@ -112,7 +131,7 @@ fun ConversationListScreen(conversations: List<Conversation>, onOpen: (Conversat
                             Badge(Modifier.semantics { contentDescription = unread }) { Text("${c.unread}") }
                         }
                     }
-                    HorizontalDivider()
+                    if (!playful) HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
@@ -240,7 +259,7 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
                 .widthIn(max = 300.dp)
                 .background(
                     if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(18.dp)
+                    MaterialTheme.shapes.large
                 ).padding(12.dp)
                 .testTag(ChatTags.BUBBLE)
         ) {
@@ -294,4 +313,13 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
 }
 
 private const val MAX_TEXT = 4000
+private const val KID_CARDS = 3
+
+/** Yellow, sky and green cards for the kids' chat list. */
+@Composable
+private fun kidCardColors() = listOf(
+    MaterialTheme.colorScheme.surfaceVariant,
+    MaterialTheme.colorScheme.secondaryContainer,
+    MaterialTheme.colorScheme.tertiaryContainer
+)
 private const val MILLIS = 1000
