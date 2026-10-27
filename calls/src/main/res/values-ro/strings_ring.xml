@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="call_channel_name">Apeluri</string>
+    <string name="call_channel_description">Sună când te sună familia</string>
+</resources>
