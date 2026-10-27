@@ -18,6 +18,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import ro.zapakid.app.testing.ContractRecorder
 import ro.zapakid.app.testing.APPLE_CODE
 import ro.zapakid.app.testing.APPLE_STATE
 import ro.zapakid.app.testing.NONCE
@@ -32,12 +33,12 @@ class HttpAuthApiTest {
            "ageRange":{"category":"adult","source":"google_play_age_signals","lowerBound":18,"upperBound":null,
            "platformStatus":"SHARED","checkedAt":"2026-10-26T10:00:00Z"},"createdAt":"2026-10-26T10:00:00Z"}"""
     private val signedIn =
-        """{"session":{"token":"zks_tok","expiresAt":"2026-11-26T10:00:00Z"},"parent":$parentJson,"newAccount":true}"""
+        """{"session":{"token":"zks_tok0000000000000000000000000000000000000000","expiresAt":"2026-11-26T10:00:00Z"},"parent":$parentJson,"newAccount":true}"""
 
     @Before
     fun setUp() {
         server.start()
-        api = HttpAuthApi(baseUrl = server.url("/v1/"), client = OkHttpClient())
+        api = HttpAuthApi(baseUrl = server.url("/v1/"), client = ContractRecorder.client())
     }
 
     @After
@@ -78,7 +79,7 @@ class HttpAuthApiTest {
                 ageRange = AgeRange.shared(lower = 18, upper = null, platformStatus = "SHARED")
             )
 
-        assertEquals("zks_tok", session.token)
+        assertEquals("zks_tok0000000000000000000000000000000000000000", session.token)
         assertEquals("2026-11-26T10:00:00Z", session.expiresAt)
         assertEquals(Parent("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11", "ana@example.com", "Ana Pop"), session.parent)
         val request = server.takeRequest()
@@ -128,7 +129,7 @@ class HttpAuthApiTest {
                 ageRange = AgeRange.unavailable(null)
             )
 
-        assertEquals("zks_tok", session.token)
+        assertEquals("zks_tok0000000000000000000000000000000000000000", session.token)
         val request = server.takeRequest()
         assertEquals("/v1/auth/apple/exchange", request.url.encodedPath)
         val sent = body(request.body!!.utf8())
@@ -202,9 +203,15 @@ class HttpAuthApiTest {
 
     @Test
     fun anErrorWithoutAJsonBodyStillHasACode() = runTest {
-        server.enqueue(MockResponse(code = 502, body = "<html>Bad gateway</html>"))
+        server.enqueue(
+            MockResponse(
+                code = 502,
+                headers = headersOf(ContractRecorder.OFF_SPEC, "robustness: a proxy error page"),
+                body = "<html>Bad gateway</html>",
+            ),
+        )
 
-        val e = expectError { api.me("zks_tok") }
+        val e = expectError { api.me("zks_tok0000000000000000000000000000000000000000") }
 
         assertEquals(502, e.status)
         assertEquals("http_502", e.code)
@@ -214,25 +221,25 @@ class HttpAuthApiTest {
     fun meSendsTheSessionAsABearerTokenAndReadsTheParent() = runTest {
         server.enqueue(MockResponse(code = 200, body = parentJson))
 
-        val parent = api.me("zks_tok")
+        val parent = api.me("zks_tok0000000000000000000000000000000000000000")
 
         assertEquals("Ana Pop", parent.displayName)
         val request = server.takeRequest()
         assertEquals("GET", request.method)
         assertEquals("/v1/me", request.url.encodedPath)
-        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+        assertEquals("Bearer zks_tok0000000000000000000000000000000000000000", request.headers["Authorization"])
     }
 
     @Test
     fun logoutPostsWithTheBearerToken() = runTest {
         server.enqueue(MockResponse(code = 204, body = ""))
 
-        api.logout("zks_tok")
+        api.logout("zks_tok0000000000000000000000000000000000000000")
 
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/v1/auth/logout", request.url.encodedPath)
-        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+        assertEquals("Bearer zks_tok0000000000000000000000000000000000000000", request.headers["Authorization"])
     }
 
     @Test
@@ -254,7 +261,7 @@ class HttpAuthApiTest {
     }
 
     private fun attested(attestation: RequestAttestation) =
-        HttpAuthApi(baseUrl = server.url("/v1/"), client = OkHttpClient(), attestation = attestation)
+        HttpAuthApi(baseUrl = server.url("/v1/"), client = ContractRecorder.client(), attestation = attestation)
 
     @Test
     fun googleSignInCarriesAPlayIntegrityTokenBoundToTheExactBody() = runTest {
@@ -293,8 +300,8 @@ class HttpAuthApiTest {
 
         api.nonce()
         api.startAppleWeb("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
-        api.me("zks_tok")
-        api.logout("zks_tok")
+        api.me("zks_tok0000000000000000000000000000000000000000")
+        api.logout("zks_tok0000000000000000000000000000000000000000")
 
         repeat(4) { assertNull(server.takeRequest().headers["ZapaKid-Attestation"]) }
         assertEquals(emptyList<String>(), attestation.hashes)

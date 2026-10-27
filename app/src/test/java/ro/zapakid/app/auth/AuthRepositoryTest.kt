@@ -223,17 +223,17 @@ class AuthRepositoryTest {
 
     @Test
     fun logoutClearsTheSessionAndTellsTheServer() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
 
         repository.logout()
 
-        assertEquals(listOf("zks_tok"), api.logouts)
+        assertEquals(listOf("zks_tok0000000000000000000000000000000000000000"), api.logouts)
         assertNull(store.session)
     }
 
     @Test
     fun logoutClearsTheSessionEvenWhenTheServerIsUnreachable() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
         api.logoutError = IOException("offline")
 
         repository.logout()
@@ -243,7 +243,7 @@ class AuthRepositoryTest {
 
     @Test
     fun restoreRefreshesTheProfileForAStoredSession() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA.copy(displayName = "Old name"))
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA.copy(displayName = "Old name"))
 
         assertEquals(ANA, repository.restore())
         assertEquals(ANA, store.session?.parent)
@@ -251,7 +251,7 @@ class AuthRepositoryTest {
 
     @Test
     fun anExpiredSessionIsDroppedWithoutACall() = runTest {
-        store.session = Session("zks_tok", "2026-10-26T09:59:59Z", ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", "2026-10-26T09:59:59Z", ANA)
         api.meError = IllegalStateException("must not be called")
 
         assertNull(repository.current())
@@ -261,7 +261,7 @@ class AuthRepositoryTest {
 
     @Test
     fun restoreDropsASessionTheServerNoLongerAccepts() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
         api.meError = AuthApiException(401, "unauthorized", "Sign in again.")
 
         assertNull(repository.restore())
@@ -270,13 +270,13 @@ class AuthRepositoryTest {
 
     @Test
     fun restoreKeepsTheSessionWhenOfflineOrTheServerIsDown() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
         api.meError = AuthApiException(503, "http_503", "Unavailable")
         assertEquals(ANA, repository.restore())
 
         api.meError = IOException("offline")
         assertEquals(ANA, repository.restore())
-        assertEquals("zks_tok", store.session?.token)
+        assertEquals("zks_tok0000000000000000000000000000000000000000", store.session?.token)
     }
 }
 

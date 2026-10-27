@@ -40,7 +40,7 @@ class DeviceRegistrationTest {
     private val blockStore = FakeBlockStore()
     private val api = FakeDeviceApi()
     private val reshare = RecordingReshare()
-    private var session: Session? = Session("zks_tok", FAR_FUTURE, ANA)
+    private var session: Session? = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
     private val cipher = TestBlobCipher()
 
     private fun registration(dir: String = "phone") = DeviceRegistration(
@@ -57,7 +57,7 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.Registered(2), registration().register())
 
         val (token, keys) = api.uploads.single()
-        assertEquals("zks_tok", token)
+        assertEquals("zks_tok0000000000000000000000000000000000000000", token)
         val identity = IdentityKey(Base64.getDecoder().decode(keys.identityKey)).publicKey
         assertTrue(
             identity.verifySignature(
