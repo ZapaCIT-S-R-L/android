@@ -28,8 +28,12 @@ import org.signal.libsignal.protocol.state.SignedPreKeyRecord
  * they survive a restart.
  */
 @Suppress("TooManyFunctions") // libsignal's SignalProtocolStore is this many functions
-class ZapaKidProtocolStore(private val records: EncryptedRecordStore, private val identity: LocalIdentity.Identity) :
-    SignalProtocolStore {
+class ZapaKidProtocolStore(
+    private val records: EncryptedRecordStore,
+    private val identity: LocalIdentity.Identity,
+    /** Called with every peer after a trust change, to back them up with the identity (Block Store). */
+    private val onTrustChanged: (List<TrustedPeer>) -> Unit = {}
+) : SignalProtocolStore {
     @Serializable
     private class PeerIdentity(val key: String, val pending: Boolean)
 
@@ -96,11 +100,20 @@ class ZapaKidProtocolStore(private val records: EncryptedRecordStore, private va
     }
 
     // One identity per account: peers are keyed by account, not device.
-    private fun putPeer(address: SignalProtocolAddress, peer: PeerIdentity) = records.put(
-        PEER_IDENTITY,
-        address.name,
-        json.encodeToString(PeerIdentity.serializer(), peer).encodeToByteArray()
-    )
+    private fun putPeer(address: SignalProtocolAddress, peer: PeerIdentity) {
+        records.put(
+            PEER_IDENTITY,
+            address.name,
+            json.encodeToString(PeerIdentity.serializer(), peer).encodeToByteArray()
+        )
+        onTrustChanged(trustedPeers())
+    }
+
+    /** Every peer this account trusts, for the backup. */
+    fun trustedPeers(): List<TrustedPeer> = records.list(PEER_IDENTITY).map { (name, value) ->
+        val peer = json.decodeFromString(PeerIdentity.serializer(), value.decodeToString())
+        TrustedPeer(name, peer.key, peer.pending)
+    }
 
     // PreKeyStore
 
@@ -204,16 +217,26 @@ class ZapaKidProtocolStore(private val records: EncryptedRecordStore, private va
     override fun loadSenderKey(sender: SignalProtocolAddress, distributionId: UUID): SenderKeyRecord? =
         records.get(SENDER_KEY, "${sessionName(sender)}$SEPARATOR$distributionId")?.let(::SenderKeyRecord)
 
-    private companion object {
-        const val PEER_IDENTITY = "peer-identity"
-        const val PRE_KEY = "prekey"
-        const val SIGNED_PRE_KEY = "signed-prekey"
-        const val KYBER_ONE_TIME = "kyber-prekey"
-        const val KYBER_LAST_RESORT = "kyber-last-resort"
-        const val KYBER_LAST_RESORT_USE = "kyber-last-resort-use"
-        const val SESSION = "session"
-        const val SENDER_KEY = "sender-key"
-        const val SEPARATOR = "\n"
-        const val PRIMARY_DEVICE = 1
+    companion object {
+        /** Puts backed-up peers into a phone's records (after a restore), without overwriting what's there. */
+        fun restoreTrust(records: EncryptedRecordStore, peers: List<TrustedPeer>) {
+            for (peer in peers) {
+                if (records.get(PEER_IDENTITY, peer.name) == null) {
+                    val value = Json.encodeToString(PeerIdentity.serializer(), PeerIdentity(peer.key, peer.pending))
+                    records.put(PEER_IDENTITY, peer.name, value.encodeToByteArray())
+                }
+            }
+        }
+
+        private const val PEER_IDENTITY = "peer-identity"
+        private const val PRE_KEY = "prekey"
+        private const val SIGNED_PRE_KEY = "signed-prekey"
+        private const val KYBER_ONE_TIME = "kyber-prekey"
+        private const val KYBER_LAST_RESORT = "kyber-last-resort"
+        private const val KYBER_LAST_RESORT_USE = "kyber-last-resort-use"
+        private const val SESSION = "session"
+        private const val SENDER_KEY = "sender-key"
+        private const val SEPARATOR = "\n"
+        private const val PRIMARY_DEVICE = 1
     }
 }

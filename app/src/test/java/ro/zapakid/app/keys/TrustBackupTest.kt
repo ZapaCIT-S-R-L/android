@@ -80,18 +80,30 @@ class TrustBackupTest {
         val other = Phone(folder.root.resolve("other"), backup = blockStore, account = "account-b")
 
         assertTrue(other.identityBackup.loadPeers().isEmpty())
-        assertTrue(other.store.isTrustedIdentity(bob, IdentityKeyPair.generate().publicKey, IdentityKeyStore.Direction.SENDING))
+        assertTrue(
+            other.store.isTrustedIdentity(bob, IdentityKeyPair.generate().publicKey, IdentityKeyStore.Direction.SENDING)
+        )
     }
 
     @Test
     fun theBlockStoreItemStaysWithinGooglesSizeLimit() = runTest {
         val alice = Phone(folder.root.resolve("alice"), backup = blockStore)
-        repeat(30) { alice.store.saveIdentity(address("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f%04d".format(it)), IdentityKeyPair.generate().publicKey) }
+        repeat(30) {
+            alice.store.saveIdentity(
+                address("7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f%04d".format(it)),
+                IdentityKeyPair.generate().publicKey
+            )
+        }
         val item = blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(alice.account)).bytes
         assertTrue("30 peers fit: ${item.size} bytes", item.size <= BlockStoreIdentityBackup.MAX_BYTES)
         assertEquals(30, alice.identityBackup.loadPeers().size)
 
-        repeat(200) { alice.store.saveIdentity(address("0b8d1e2a-9c3f-4d5e-8f60-11223344%04d".format(it)), IdentityKeyPair.generate().publicKey) }
+        repeat(200) {
+            alice.store.saveIdentity(
+                address("0b8d1e2a-9c3f-4d5e-8f60-11223344%04d".format(it)),
+                IdentityKeyPair.generate().publicKey
+            )
+        }
         val full = blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(alice.account)).bytes
         assertTrue("never over the limit: ${full.size} bytes", full.size <= BlockStoreIdentityBackup.MAX_BYTES)
         assertTrue("the identity is always kept", alice.identityBackup.load() != null)

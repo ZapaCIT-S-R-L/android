@@ -39,7 +39,12 @@ class LocalIdentity(private val records: EncryptedRecordStore, private val backu
                     local
                 }
 
-                backedUp != null -> backedUp.also { records.put(KIND, KEY_PAIR, it) }
+                backedUp != null ->
+                    backedUp.also {
+                        records.put(KIND, KEY_PAIR, it)
+                        // A restored identity brings back whom it trusted: no fresh trust on first use.
+                        ZapaKidProtocolStore.restoreTrust(records, backup.loadPeers())
+                    }
 
                 accountHasIdentity -> {
                     reshare.request()
@@ -74,6 +79,11 @@ interface IdentityBackup {
     suspend fun load(): ByteArray?
 
     suspend fun save(keyPair: ByteArray)
+
+    /** The peers this account trusts, backed up with the identity. */
+    suspend fun loadPeers(): List<TrustedPeer>
+
+    suspend fun savePeers(peers: List<TrustedPeer>)
 }
 
 /** Asks another family phone to re-share the identity. TODO(reshare): the flow itself (a later PR); a stub for now. */
