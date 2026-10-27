@@ -81,7 +81,9 @@ class DeviceSetupViewModelTest {
     @Test
     fun anotherAccountSetsUpAgain() = runTest {
         val registrar =
-            FakeRegistrar(ArrayDeque(listOf(DeviceRegistration.Result.Registered(2), DeviceRegistration.Result.WaitingForReshare)))
+            FakeRegistrar(
+                ArrayDeque(listOf(DeviceRegistration.Result.Registered(2), DeviceRegistration.Result.WaitingForReshare))
+            )
         val vm = DeviceSetupViewModel(registrar)
 
         vm.start("account-a")

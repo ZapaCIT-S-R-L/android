@@ -29,7 +29,7 @@ fun ZapaKidApp(
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
 
         is AuthUiState.SignedIn -> {
-            LaunchedEffect(Unit) { deviceSetup.start() }
+            LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
             val device by deviceSetup.state.collectAsStateWithLifecycle()
             HomeScreen(
                 parent = s.parent,

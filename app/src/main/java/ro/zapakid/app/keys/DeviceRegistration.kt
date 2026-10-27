@@ -16,8 +16,7 @@ fun interface DeviceRegistrar {
  * upload succeeds, so a retry sends the same keys instead of making new ones.
  */
 class DeviceRegistration(
-    private val records: EncryptedRecordStore,
-    private val backup: IdentityBackup,
+    private val accounts: AccountKeys,
     private val api: DeviceApi,
     private val session: () -> Session?,
     private val reshare: IdentityReshare,
@@ -33,23 +32,26 @@ class DeviceRegistration(
 
     enum class Error { SIGNED_OUT, NETWORK, SERVER, IDENTITY_MISMATCH }
 
+    /** Registers the signed-in account's identity on this phone; everything is keyed by that account. */
     override suspend fun register(): Result {
-        val registered = records.get(KIND, DEVICE_ID)?.let { Result.Registered(ByteBuffer.wrap(it).int) }
-        val current = session()
-        return when {
-            registered != null -> registered
-            current == null -> Result.Failed(Error.SIGNED_OUT)
-            else -> registerWith(current)
-        }
+        val current = session() ?: return Result.Failed(Error.SIGNED_OUT)
+        val records = accounts.records(current.parent.id)
+        return records.get(KIND, DEVICE_ID)?.let { Result.Registered(ByteBuffer.wrap(it).int) }
+            ?: registerWith(current, records)
     }
 
     @Suppress("SwallowedException") // errors become results
-    private suspend fun registerWith(current: Session): Result =
+    private suspend fun registerWith(current: Session, records: EncryptedRecordStore): Result =
         try {
             val hasIdentity = api.accountHasIdentity(current.token, current.parent.id)
-            when (val state = LocalIdentity(records, backup).resolve(hasIdentity, reshare)) {
+            when (
+                val state = LocalIdentity(
+                    records,
+                    accounts.backup(current.parent.id)
+                ).resolve(hasIdentity, reshare)
+            ) {
                 LocalIdentity.State.WaitingForReshare -> Result.WaitingForReshare
-                is LocalIdentity.State.Ready -> upload(current.token, state.identity)
+                is LocalIdentity.State.Ready -> upload(current.token, state.identity, records)
             }
         } catch (e: AuthApiException) {
             Result.Failed(
@@ -63,7 +65,7 @@ class DeviceRegistration(
             Result.Failed(Error.NETWORK)
         }
 
-    private suspend fun upload(token: String, identity: LocalIdentity.Identity): Result {
+    private suspend fun upload(token: String, identity: LocalIdentity.Identity, records: EncryptedRecordStore): Result {
         val keys =
             records.get(KIND, PENDING_KEYS)?.let {
                 DeviceKeys.json.decodeFromString(DeviceKeys.serializer(), it.decodeToString())

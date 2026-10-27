@@ -88,7 +88,10 @@ class DeviceRegistrationTest {
         assertEquals(DeviceRegistration.Result.WaitingForReshare, registration().register())
         assertTrue(api.uploads.isEmpty())
         assertEquals(1, reshare.requests)
-        assertTrue("no keys made", AccountKeys(folder.root.resolve("phone"), cipher, blockStore).records(ANA.id).list("prekey").isEmpty())
+        assertTrue(
+            "no keys made",
+            AccountKeys(folder.root.resolve("phone"), cipher, blockStore).records(ANA.id).list("prekey").isEmpty()
+        )
     }
 
     @Test

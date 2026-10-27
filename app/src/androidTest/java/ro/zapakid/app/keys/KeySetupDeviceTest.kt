@@ -38,7 +38,10 @@ class KeySetupDeviceTest {
         val identity =
             (
                 runBlocking {
-                    LocalIdentity(records, BlockStoreIdentityBackup(FakeBlockStore(), "account-$i")).resolve(false, NoReshare)
+                    LocalIdentity(
+                        records,
+                        BlockStoreIdentityBackup(FakeBlockStore(), "account-$i")
+                    ).resolve(false, NoReshare)
                 } as LocalIdentity.State.Ready
                 )
                 .identity
