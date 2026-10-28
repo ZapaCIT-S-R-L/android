@@ -10,6 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.signal.libsignal.protocol.IdentityKey
+import org.signal.libsignal.protocol.IdentityKeyPair
 import ro.zapakid.app.auth.AuthApiException
 import ro.zapakid.app.auth.Session
 import ro.zapakid.app.testing.ANA
@@ -23,7 +24,7 @@ class DeviceRegistrationTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private class FakeDeviceApi(var hasIdentity: Boolean = false, var fail: Exception? = null) : DeviceApi {
+    private class FakeDeviceApi(var identityKey: ByteArray? = null, var fail: Exception? = null) : DeviceApi {
         val uploads = mutableListOf<Pair<String, DeviceKeys>>()
 
         override suspend fun register(token: String, keys: DeviceKeys): Int {
@@ -35,7 +36,7 @@ class DeviceRegistrationTest {
             return 2
         }
 
-        override suspend fun accountHasIdentity(token: String, accountId: String): Boolean = hasIdentity
+        override suspend fun accountIdentityKey(token: String, accountId: String): ByteArray? = identityKey
     }
 
     private val blockStore = FakeBlockStore()
@@ -74,7 +75,7 @@ class DeviceRegistrationTest {
     @Test
     fun theParentsSecondPhoneRegistersWithTheAccountIdentityFromBlockStore() = runTest {
         registration("phone-1").register()
-        api.hasIdentity = true
+        api.identityKey = Base64.getDecoder().decode(api.uploads[0].second.identityKey)
 
         assertEquals(DeviceRegistration.Result.Registered(2), registration("phone-2").register())
         assertEquals(api.uploads[0].second.identityKey, api.uploads[1].second.identityKey)
@@ -83,7 +84,7 @@ class DeviceRegistrationTest {
 
     @Test
     fun aPhoneWithoutTheAccountIdentityWaitsForAReshareAndUploadsNothing() = runTest {
-        api.hasIdentity = true
+        api.identityKey = IdentityKeyPair.generate().publicKey.serialize()
 
         assertEquals(DeviceRegistration.Result.WaitingForReshare, registration().register())
         assertTrue(api.uploads.isEmpty())
@@ -92,6 +93,17 @@ class DeviceRegistrationTest {
             "no keys made",
             AccountKeys(folder.root.resolve("phone"), cipher, blockStore).records(ANA.id).list("prekey").isEmpty()
         )
+    }
+
+    // Review of #12 (2026-10-28), item 1: a Block Store copy is used only when it matches the registered key.
+    @Test
+    fun aBlockStoreCopyThatDoesNotMatchTheRegisteredKeyIsNeverUploaded() = runTest {
+        registration("phone-1").register()
+        api.identityKey = IdentityKeyPair.generate().publicKey.serialize() // the account's key changed elsewhere
+
+        assertEquals(DeviceRegistration.Result.WaitingForReshare, registration("phone-2").register())
+        assertEquals("only phone-1 uploaded", 1, api.uploads.size)
+        assertEquals(1, reshare.requests)
     }
 
     @Test

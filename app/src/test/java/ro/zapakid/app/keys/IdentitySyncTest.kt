@@ -1,5 +1,9 @@
 package ro.zapakid.app.keys
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -8,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.signal.libsignal.protocol.IdentityKeyPair
 import ro.zapakid.app.testing.FakeBlockStore
 import ro.zapakid.app.testing.NoReshare
 import ro.zapakid.app.testing.RecordingReshare
@@ -162,6 +167,95 @@ class IdentitySyncTest {
             )
                 .resolve(accountHasIdentity = true, reshare = reshare)
         assertEquals(LocalIdentity.State.WaitingForReshare, state)
+    }
+
+    // Review of #12 (2026-10-28), item 1: a copy is checked against the account's registered public identity key.
+    @Test
+    fun aCopyThatDoesNotMatchTheRegisteredKeyIsNeverUsed() = runTest {
+        identityOn("phone").resolve(false, NoReshare)
+        val registered = IdentityKeyPair.generate().publicKey.serialize() // the account's key is another one
+
+        val reshare = RecordingReshare()
+        val state = identityOn("phone").resolveVerified(registered, reshare)
+
+        assertEquals(LocalIdentity.State.WaitingForReshare, state)
+        assertEquals(1, reshare.requests)
+    }
+
+    @Test
+    fun aMatchingCopyIsUsedAndAStaleLocalOneIsReplacedByTheMatchingBackup() = runTest {
+        val cipher = TestBlobCipher()
+        identityOn("phone", cipher).resolve(false, NoReshare) // a stale identity on this phone
+        val current = IdentityKeyPair.generate()
+        BlockStoreIdentityBackup(blockStore, ACCOUNT).save(current.serialize()) // the account's current one
+
+        val state = identityOn("phone", cipher).resolveVerified(current.publicKey.serialize(), NoReshare).ready()
+        assertArrayEquals(current.serialize(), state.keyPair.serialize())
+        val again = identityOn("phone", cipher).resolveVerified(current.publicKey.serialize(), NoReshare).ready()
+        assertArrayEquals("kept on the phone", current.serialize(), again.keyPair.serialize())
+    }
+
+    @Test
+    fun signingInAsAnotherAccountOnTheSamePhoneNeverInheritsTheFirstIdentity() = runTest {
+        val keys = AccountKeys(folder.root.resolve("phone"), TestBlobCipher(), blockStore)
+        val a = LocalIdentity(keys.records(ACCOUNT), keys.backup(ACCOUNT)).resolve(false, NoReshare).ready()
+        // Sign out of ACCOUNT, sign in as OTHER: its records and Block Store item are separate.
+        val reshare = RecordingReshare()
+        val b = LocalIdentity(keys.records(OTHER), keys.backup(OTHER)).resolve(true, reshare)
+        assertEquals("OTHER has an identity this phone lacks", LocalIdentity.State.WaitingForReshare, b)
+        val fresh = LocalIdentity(keys.records(OTHER), keys.backup(OTHER)).resolve(false, NoReshare).ready()
+        assertFalse(a.keyPair.serialize().contentEquals(fresh.keyPair.serialize()))
+    }
+
+    // Item 2: Block Store failing (no Play services, ApiException) must not block a phone that has its key.
+    @Test
+    fun aBlockStoreFailureDoesNotBlockAPhoneThatAlreadyHasItsKey() = runTest {
+        val cipher = TestBlobCipher()
+        val before = identityOn("phone", cipher).resolve(false, NoReshare).ready()
+        blockStore.failing = true
+
+        val after = identityOn("phone", cipher).resolve(true, NoReshare).ready()
+        assertArrayEquals(before.keyPair.serialize(), after.keyPair.serialize())
+    }
+
+    @Test
+    fun aBlockStoreFailureWithoutALocalKeyIsReportedAndMakesNoNewIdentity() = runTest {
+        blockStore.failing = true
+        val records = EncryptedRecordStore(folder.root.resolve("phone"), TestBlobCipher())
+        val result = runCatching {
+            LocalIdentity(records, BlockStoreIdentityBackup(blockStore, ACCOUNT)).resolve(false, NoReshare)
+        }
+        assertTrue(result.isFailure)
+        assertTrue("no identity on the phone", records.list("local-identity").isEmpty())
+    }
+
+    // Item 3: saved on-device only, then re-saved with cloud backup once a screen lock makes it end-to-end encrypted.
+    @Test
+    fun itIsReSavedToTheCloudOnceEndToEndEncryptionBecomesAvailable() = runTest {
+        val cipher = TestBlobCipher()
+        blockStore.endToEndEncryption = false
+        identityOn("phone", cipher).resolve(false, NoReshare)
+        assertFalse(blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(ACCOUNT)).backupToCloud)
+
+        blockStore.endToEndEncryption = true
+        identityOn("phone", cipher).resolve(true, NoReshare)
+        assertTrue(blockStore.items.getValue(BlockStoreIdentityBackup.keyFor(ACCOUNT)).backupToCloud)
+        val stores = blockStore.stores
+        identityOn("phone", cipher).resolve(true, NoReshare)
+        assertEquals("not re-saved once it is in the cloud", stores, blockStore.stores)
+    }
+
+    // Item 4: two concurrent first runs must not make two identities.
+    @Test
+    fun concurrentFirstRunsMakeOneIdentity() = runTest {
+        val cipher = TestBlobCipher()
+        val results = coroutineScope {
+            List(8) {
+                async(Dispatchers.Default) { identityOn("phone", cipher).resolve(false, NoReshare).ready() }
+            }.awaitAll()
+        }
+        assertEquals(1, results.map { it.keyPair.serialize().toList() }.toSet().size)
+        assertEquals("stored once", 1, blockStore.stores)
     }
 
     private companion object {

@@ -67,6 +67,8 @@ class BlockStoreIdentityBackup(private val blockStore: BlockStoreApi, private va
 
     private fun encode(blob: Blob) = json.encodeToString(Blob.serializer(), blob).encodeToByteArray()
 
+    override suspend fun cloudBackupAvailable(): Boolean = blockStore.isEndToEndEncryptionAvailable()
+
     companion object {
         private const val VERSION = 1
         private const val TRIM_STEP = 10
