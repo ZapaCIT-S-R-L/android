@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="call_calling">Wird angerufen…</string>
+    <string name="call_ringing">ruft dich an!</string>
+    <string name="call_ringing_group">Gruppenanruf!</string>
+    <string name="call_connecting">Verbindung wird aufgebaut…</string>
+    <string name="call_reconnecting">Verbindung verloren. Wir versuchen es nochmal…</string>
+    <string name="call_in_call">Im Gespräch</string>
+    <string name="call_encrypted">Nur du und deine Familie könnt diesen Anruf hören</string>
+    <plurals name="call_people_count">
+        <item quantity="one">%1$d Person im Anruf</item>
+        <item quantity="other">%1$d Personen im Anruf</item>
+    </plurals>
+    <string name="call_ended">Anruf beendet</string>
+    <string name="call_ended_declined">Gerade kann niemand sprechen</string>
+    <string name="call_ended_no_answer">Niemand hat abgenommen. Versuch es später nochmal!</string>
+    <string name="call_ended_missed">Du hast einen Anruf verpasst</string>
+    <string name="call_ended_everyone_left">Alle haben den Anruf verlassen</string>
+    <string name="call_ended_connection">Die Verbindung ist abgebrochen</string>
+    <string name="call_ended_failed">Der Anruf hat nicht geklappt. Versuch es nochmal.</string>
+    <string name="call_close">Schließen</string>
+    <string name="call_accept">Annehmen</string>
+    <string name="call_decline">Ablehnen</string>
+    <string name="call_end">Auflegen</string>
+    <string name="call_mute">Mikrofon</string>
+    <string name="call_speaker">Lautsprecher</string>
+    <string name="call_on">An</string>
+    <string name="call_off">Aus</string>
+    <string name="call_speaking">spricht</string>
+    <string name="call_log_title">Anrufe</string>
+    <string name="call_log_empty">Noch keine Anrufe. Ruf jemanden aus deiner Familie an!</string>
+    <string name="call_log_missed">Verpasst</string>
+    <string name="call_log_incoming">Eingehend</string>
+    <string name="call_log_outgoing">Ausgehend</string>
+    <string name="call_log_call_again">%1$s anrufen</string>
+    <string name="call_log_duration">%1$d:%2$02d</string>
+    <string name="permission_mic_title">Darf ZapaKid das Mikrofon benutzen?</string>
+    <string name="permission_mic_body">Damit deine Familie dich hört, wenn du anrufst. ZapaKid hört nur während eines Anrufs zu und nimmt nie etwas auf.</string>
+    <string name="permission_notifications_title">Darf ZapaKid klingeln?</string>
+    <string name="permission_notifications_body">Damit dein Handy klingelt, wenn deine Familie anruft.</string>
+    <string name="permission_allow">OK, erlauben</string>
+    <string name="permission_not_now">Jetzt nicht</string>
+    <string name="permission_mic_denied">Ohne Mikrofon kann dich niemand hören. Du kannst es in den Einstellungen einschalten.</string>
+</resources>
