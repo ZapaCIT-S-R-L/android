@@ -15,7 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
  * The key never leaves the secure hardware; it is not in any backup, so a restored phone starts signed out.
  * Platform crypto only: no home-made primitives. Chat encryption is libsignal's job, not this class's.
  */
-class KeystoreSessionCipher(private val alias: String = DEFAULT_ALIAS) : SessionCipher {
+class KeystoreBlobCipher(private val alias: String = DEFAULT_ALIAS) : BlobCipher {
     override fun encrypt(plaintext: ByteArray): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())

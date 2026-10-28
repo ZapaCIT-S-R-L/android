@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 
 /** The real Android Keystore key protecting the session on the device. */
 @RunWith(AndroidJUnit4::class)
-class KeystoreSessionCipherTest {
+class KeystoreBlobCipherTest {
     private val alias = "zapakid.test.session"
 
     @After
@@ -24,7 +24,7 @@ class KeystoreSessionCipherTest {
 
     @Test
     fun encryptsAndDecryptsWithAKeystoreKey() {
-        val cipher = KeystoreSessionCipher(alias)
+        val cipher = KeystoreBlobCipher(alias)
         val plain = "secret-session-token".toByteArray()
 
         val sealed = cipher.encrypt(plain)
@@ -38,12 +38,12 @@ class KeystoreSessionCipherTest {
     fun aSessionStoredOnTheDeviceIsNotReadableWithoutTheKey() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = File(context.noBackupFilesDir, "test-session.bin")
-        val store = EncryptedSessionStore(file, KeystoreSessionCipher(alias))
+        val store = EncryptedSessionStore(file, KeystoreBlobCipher(alias))
         store.save(Session("zks_tok", "2099-01-01T00:00:00Z", Parent("p_1", null, "Ana Pop")))
 
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
 
-        assertNull(EncryptedSessionStore(file, KeystoreSessionCipher(alias)).load())
+        assertNull(EncryptedSessionStore(file, KeystoreBlobCipher(alias)).load())
         file.delete()
     }
 }

@@ -14,8 +14,8 @@ interface SessionStore {
     fun clear()
 }
 
-/** Encrypts/decrypts the stored session. On the device: [KeystoreSessionCipher]. */
-interface SessionCipher {
+/** Encrypts/decrypts the stored session. On the device: [KeystoreBlobCipher]. */
+interface BlobCipher {
     fun encrypt(plaintext: ByteArray): ByteArray
 
     fun decrypt(ciphertext: ByteArray): ByteArray
@@ -25,7 +25,7 @@ interface SessionCipher {
  * The session as one encrypted file, in noBackupFilesDir on the device (never in a backup).
  * A file that doesn't decrypt (tampered, or the key is gone) is deleted and treated as signed out.
  */
-class EncryptedSessionStore(private val file: File, private val cipher: SessionCipher) : SessionStore {
+class EncryptedSessionStore(private val file: File, private val cipher: BlobCipher) : SessionStore {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Synchronized
