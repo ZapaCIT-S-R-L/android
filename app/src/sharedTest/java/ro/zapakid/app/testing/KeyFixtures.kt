@@ -42,14 +42,28 @@ class FakeBlockStore(var endToEndEncryption: Boolean = true) : BlockStoreApi {
     val items = mutableMapOf<String, Item>()
     var stores = 0
 
-    override suspend fun isEndToEndEncryptionAvailable(): Boolean = endToEndEncryption
+    /** No Google Play services, or an ApiException: every call throws. */
+    var failing = false
+
+    private fun check() {
+        if (failing) throw IllegalStateException("Block Store unavailable")
+    }
+
+    override suspend fun isEndToEndEncryptionAvailable(): Boolean {
+        check()
+        return endToEndEncryption
+    }
 
     override suspend fun store(key: String, bytes: ByteArray, backupToCloud: Boolean) {
+        check()
         stores++
         items[key] = Item(bytes.copyOf(), backupToCloud)
     }
 
-    override suspend fun retrieve(key: String): ByteArray? = items[key]?.bytes?.copyOf()
+    override suspend fun retrieve(key: String): ByteArray? {
+        check()
+        return items[key]?.bytes?.copyOf()
+    }
 }
 
 object NoReshare : IdentityReshare {

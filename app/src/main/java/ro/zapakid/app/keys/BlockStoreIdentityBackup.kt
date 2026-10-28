@@ -37,6 +37,8 @@ class BlockStoreIdentityBackup(private val blockStore: BlockStoreApi, private va
         )
     }
 
+    override suspend fun cloudBackupAvailable(): Boolean = blockStore.isEndToEndEncryptionAvailable()
+
     companion object {
         private const val VERSION = 1
 
