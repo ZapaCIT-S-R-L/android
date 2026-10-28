@@ -13,13 +13,25 @@ class IncomingRoutingTest {
         IncomingRouting.report(
             canRing = canRing,
             telecomAllowed = telecom,
-            register = { log += "register" },
-            addToTelecom = {
-                if (addFails) throw SecurityException("no phone account")
-                log += "telecom"
-            },
-            notify = { log += "notify" },
-            missed = { log += "missed" }
+            ways =
+                object : IncomingRouting.Ways {
+                    override fun register() {
+                        log += "register"
+                    }
+
+                    override fun addToTelecom() {
+                        if (addFails) throw SecurityException("no phone account")
+                        log += "telecom"
+                    }
+
+                    override fun showNotification() {
+                        log += "notify"
+                    }
+
+                    override fun missed() {
+                        log += "missed"
+                    }
+                }
         )
 
     @Test
