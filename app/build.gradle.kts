@@ -13,7 +13,7 @@ fun quoted(property: String, default: String = ""): String {
 }
 
 fun cloudProjectNumber(): Long {
-    val value = providers.gradleProperty("zapakid.playCloudProjectNumber").getOrElse("0")
+    val value = providers.gradleProperty("zapakid.playCloudProjectNumber").getOrElse("64042746735")
     return requireNotNull(value.toLongOrNull()) { "zapakid.playCloudProjectNumber must be a number" }
 }
 
@@ -50,7 +50,7 @@ android {
             "APPLE_SERVICES_ID",
             quoted("zapakid.appleServicesId", default = "ro.zapakid.signin")
         )
-        // Google Cloud project linked to Play Integrity in Play Console (public). 0 = not set up: no integrity token.
+        // Google Cloud project linked to the Play app ro.zapakid.app for Play Integrity (public). 0 = no token.
         buildConfigField("long", "PLAY_CLOUD_PROJECT_NUMBER", "${cloudProjectNumber()}L")
         buildConfigField(
             "String",
