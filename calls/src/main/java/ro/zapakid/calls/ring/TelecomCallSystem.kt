@@ -13,12 +13,19 @@ import androidx.core.content.ContextCompat
  * Bluetooth headsets and car kits get the call, and Do Not Disturb rules apply. The ringing UI itself is ours
  * (a full-screen notification, see [CallNotifications]).
  */
-class TelecomCallSystem(private val context: Context) : CallSystem {
+class TelecomCallSystem(
+    private val context: Context,
+    private val label: CharSequence = context.applicationInfo.loadLabel(context.packageManager)
+) : CallSystem {
     private val telecom = context.getSystemService(TelecomManager::class.java)
     private val handle = PhoneAccountHandle(ComponentName(context, ZapaConnectionService::class.java), ACCOUNT_ID)
 
-    /** Registers the phone account once per app start. */
-    fun register(label: CharSequence) {
+    @Volatile
+    private var registered = false
+
+    /** Registers the phone account; idempotent, and done before every incoming call (a push may start the process). */
+    fun register() {
+        if (registered) return
         val account =
             PhoneAccount
                 .builder(handle, label)
@@ -26,13 +33,25 @@ class TelecomCallSystem(private val context: Context) : CallSystem {
                 .setSupportedUriSchemes(listOf(SCHEME))
                 .build()
         telecom.registerPhoneAccount(account)
+        registered = true
     }
 
-    override fun reportIncoming(callId: String, title: ConversationTitle) {
-        if (!allowed()) {
-            CallNotifications.showIncoming(context, callId, title)
-            return
-        }
+    override fun reportIncoming(callId: String, title: ConversationTitle) = IncomingRouting.report(
+        canRing = CallNotifications.canRing(context),
+        telecomAllowed = allowed(),
+        ways =
+            object : IncomingRouting.Ways {
+                override fun register() = this@TelecomCallSystem.register()
+
+                override fun addToTelecom() = addIncoming(callId, title)
+
+                override fun showNotification() = CallNotifications.showIncoming(context, callId, title)
+
+                override fun missed() = CallRinger.send(callId, CallRinger.Action.MISSED)
+            }
+    )
+
+    private fun addIncoming(callId: String, title: ConversationTitle) {
         val extras =
             Bundle().apply {
                 putString(EXTRA_CALL_ID, callId)
@@ -50,6 +69,7 @@ class TelecomCallSystem(private val context: Context) : CallSystem {
 
     override fun reportOutgoing(callId: String, title: ConversationTitle) {
         if (!allowed()) return
+        register()
         val extras =
             Bundle().apply {
                 putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)

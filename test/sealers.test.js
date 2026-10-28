@@ -12,12 +12,19 @@ const files = execFileSync("git", ["ls-files", "-z", "*.kt"], { encoding: "utf8"
 const IMPLEMENTS = /(?:\b(?:class|object)\s+\w+|\))\s*:\s*(?:[\w.]+(?:\([^)]*\))?\s*,\s*)*(CallKeySealer|MessageSealer)\b/;
 const TEST_SETS = /\/src\/(test|androidTest|sharedTest)\//;
 
+// Function signatures ("fun x(...): CallKeySealer") end in ")" + ":" too; drop them before matching supertypes.
+const FUNCTIONS = /\bfun\b[^{=]*/g;
+
+function implementsSealer(text) {
+  return text.replace(FUNCTIONS, "").match(IMPLEMENTS)?.[1] ?? null;
+}
+
 test("only test source sets hold fake sealers; shipped code only the libsignal one", () => {
   const offenders = [];
   for (const file of files) {
-    const match = readFileSync(file, "utf8").match(IMPLEMENTS);
-    if (!match || TEST_SETS.test(file)) continue;
-    if (!/\/Libsignal\w*\.kt$/.test(file)) offenders.push(`${file}: implements ${match[1]}`);
+    const sealer = implementsSealer(readFileSync(file, "utf8"));
+    if (!sealer || TEST_SETS.test(file)) continue;
+    if (!/\/Libsignal\w*\.kt$/.test(file)) offenders.push(`${file}: implements ${sealer}`);
   }
   assert.deepEqual(offenders, []);
 });
@@ -36,4 +43,12 @@ test("a release bundle without the libsignal sealers fails to build", () => {
   assert.match(app, /val checkRealSealers by tasks\.registering/);
   assert.match(app, /include\("\*\*\/Libsignal\*Sealer\*\.kt"\)/);
   assert.match(app, /it\.name == "bundleRelease" \}\.configureEach \{ dependsOn\(checkRealSealers\) \}/);
+});
+
+test("a function returning a sealer is not an implementation (review of #46, item 6)", () => {
+  assert.equal(implementsSealer("fun sealer(): CallKeySealer = real"), null);
+  assert.equal(implementsSealer("private fun make(a: Int, b: String): MessageSealer {"), null);
+  assert.equal(implementsSealer("class A(val b: Int) : CallKeySealer {"), "CallKeySealer");
+  assert.equal(implementsSealer("class A(\n    val b: Int\n) : Base(), MessageSealer {"), "MessageSealer");
+  assert.equal(implementsSealer("object Fake : CallKeySealer {"), "CallKeySealer");
 });

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
@@ -44,8 +45,26 @@ object CallNotifications {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    /** Whether a ringing call can be shown: notifications on, and on Android 14+ the full-screen intent allowed. */
+    fun canRing(context: Context): Boolean = canRing(
+        notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
+        sdk = Build.VERSION.SDK_INT,
+        fullScreenAllowed =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+                context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+    )
+
+    fun canRing(notificationsEnabled: Boolean, sdk: Int, fullScreenAllowed: Boolean): Boolean =
+        notificationsEnabled && (sdk < Build.VERSION_CODES.UPSIDE_DOWN_CAKE || fullScreenAllowed)
+
     fun showIncoming(context: Context, callId: String, title: ConversationTitle) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+        val app = context.applicationContext
+        // Answer or Decline from anywhere (Telecom, Bluetooth, watch) takes the ringing UI down.
+        CallRinger.stopRinging = { id ->
+            cancel(app, id)
+            IncomingCallActivity.close(id)
+        }
         createChannel(context)
         val caller = Person.Builder().setName(title.name).setImportant(true).build()
         val fullScreen =
@@ -100,15 +119,15 @@ class CallActionReceiver : BroadcastReceiver() {
         CallNotifications.cancel(context, callId)
         when (intent.action) {
             ACCEPT -> {
-                CallRinger.handler?.accept(callId)
-                ZapaConnectionService.active(callId)
+                // Waits for the app's call controller when a push woke a fresh process; opening the app wires it.
+                CallRinger.send(callId, CallRinger.Action.ACCEPT)
                 context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
                     ContextCompat.startActivity(context, it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), null)
                 }
             }
 
             DECLINE -> {
-                CallRinger.handler?.decline(callId)
+                CallRinger.send(callId, CallRinger.Action.DECLINE)
                 ZapaConnectionService.end(callId)
             }
         }
