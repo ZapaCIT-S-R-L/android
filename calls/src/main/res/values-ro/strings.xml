@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="call_calling">Se sună…</string>
+    <string name="call_ringing">te sună!</string>
+    <string name="call_ringing_group">Apel de grup!</string>
+    <string name="call_connecting">Se conectează…</string>
+    <string name="call_reconnecting">S-a pierdut legătura. Încercăm din nou…</string>
+    <string name="call_in_call">În apel</string>
+    <string name="call_encrypted">Doar tu și familia ta puteți auzi acest apel</string>
+    <plurals name="call_people_count">
+        <item quantity="one">%1$d persoană în apel</item>
+        <item quantity="few">%1$d persoane în apel</item>
+        <item quantity="other">%1$d de persoane în apel</item>
+    </plurals>
+    <string name="call_ended">Apel încheiat</string>
+    <string name="call_ended_declined">Nu pot vorbi acum</string>
+    <string name="call_ended_no_answer">Nu a răspuns nimeni. Încearcă mai târziu!</string>
+    <string name="call_ended_missed">Ai un apel pierdut</string>
+    <string name="call_ended_everyone_left">Toți au ieșit din apel</string>
+    <string name="call_ended_connection">S-a pierdut legătura</string>
+    <string name="call_ended_failed">Apelul nu a mers. Încearcă din nou.</string>
+    <string name="call_close">Închide</string>
+    <string name="call_accept">Răspunde</string>
+    <string name="call_decline">Respinge</string>
+    <string name="call_end">Închide apelul</string>
+    <string name="call_mute">Microfon</string>
+    <string name="call_speaker">Difuzor</string>
+    <string name="call_on">Pornit</string>
+    <string name="call_off">Oprit</string>
+    <string name="call_speaking">vorbește</string>
+    <string name="call_log_title">Apeluri</string>
+    <string name="call_log_empty">Niciun apel încă. Sună pe cineva din familie!</string>
+    <string name="call_log_missed">Pierdut</string>
+    <string name="call_log_incoming">Primit</string>
+    <string name="call_log_outgoing">Efectuat</string>
+    <string name="call_log_call_again">Sună pe %1$s</string>
+    <string name="call_log_duration">%1$d:%2$02d</string>
+    <string name="permission_mic_title">Lasă ZapaKid să folosească microfonul</string>
+    <string name="permission_mic_body">Ca familia ta să te audă când suni. ZapaKid ascultă doar în timpul apelului și nu îl înregistrează niciodată.</string>
+    <string name="permission_notifications_title">Lasă ZapaKid să sune</string>
+    <string name="permission_notifications_body">Ca telefonul tău să sune când te sună familia.</string>
+    <string name="permission_allow">Bine, permite</string>
+    <string name="permission_not_now">Nu acum</string>
+    <string name="permission_mic_denied">Fără microfon nu te aude nimeni. Îl poți porni din Setări.</string>
+</resources>
