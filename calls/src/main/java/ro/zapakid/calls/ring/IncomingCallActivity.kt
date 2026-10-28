@@ -1,5 +1,6 @@
 package ro.zapakid.calls.ring
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -10,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import java.lang.ref.WeakReference
 import ro.zapakid.calls.CallState
 import ro.zapakid.calls.CallUiState
 import ro.zapakid.calls.ui.CallActions
@@ -29,6 +31,8 @@ class IncomingCallActivity : ComponentActivity() {
             finish()
             return
         }
+        current = WeakReference(this)
+        shownCallId = callId
         val state =
             CallUiState(
                 phase = CallState.Ringing,
@@ -57,8 +61,25 @@ class IncomingCallActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        if (current?.get() === this) current = null
+        super.onDestroy()
+    }
+
     private fun actions(callId: String) = object : CallActions {
+        // Over the lock screen, Answer unlocks first (the call screen and the rest of the app are behind it).
         override fun accept() {
+            val keyguard = getSystemService(KeyguardManager::class.java)
+            if (keyguard?.isKeyguardLocked != true) return answer()
+            keyguard.requestDismissKeyguard(
+                this@IncomingCallActivity,
+                object : KeyguardManager.KeyguardDismissCallback() {
+                    override fun onDismissSucceeded() = answer()
+                }
+            )
+        }
+
+        private fun answer() {
             sendBroadcast(
                 Intent(
                     this@IncomingCallActivity,
@@ -88,6 +109,15 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     companion object {
+        private var current: WeakReference<IncomingCallActivity>? = null
+        private var shownCallId: String? = null
+
+        /** Takes the full-screen call down when it was answered or declined elsewhere (Telecom, Bluetooth, watch). */
+        fun close(callId: String) {
+            val activity = current?.get() ?: return
+            if (shownCallId == callId) activity.runOnUiThread { activity.finish() }
+        }
+
         fun intent(context: Context, callId: String, title: ConversationTitle): Intent =
             Intent(context, IncomingCallActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)

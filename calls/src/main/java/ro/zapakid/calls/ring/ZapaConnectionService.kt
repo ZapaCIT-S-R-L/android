@@ -5,6 +5,7 @@ import android.telecom.ConnectionRequest
 import android.telecom.ConnectionService
 import android.telecom.DisconnectCause
 import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -13,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class ZapaConnectionService : ConnectionService() {
     override fun onCreateIncomingConnection(account: PhoneAccountHandle?, request: ConnectionRequest): Connection {
-        val extras = request.extras
+        val extras = request.extras.getBundle(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS) ?: request.extras
         val callId = extras.getString(TelecomCallSystem.EXTRA_CALL_ID).orEmpty()
         val title =
             ConversationTitle(
@@ -21,11 +22,21 @@ class ZapaConnectionService : ConnectionService() {
                 extras.getInt(TelecomCallSystem.EXTRA_AVATAR),
                 extras.getBoolean(TelecomCallSystem.EXTRA_GROUP)
             )
+        // Without notifications or the full-screen intent nobody would see it ring: reject it, log it as missed.
+        if (!CallNotifications.canRing(this)) {
+            CallRinger.send(callId, CallRinger.Action.MISSED)
+            return Connection.createFailedConnection(DisconnectCause(DisconnectCause.REJECTED))
+        }
         return ZapaConnection(callId).apply {
             setRinging()
             connections[callId] = this
             CallNotifications.showIncoming(this@ZapaConnectionService, callId, title)
         }
+    }
+
+    override fun onCreateIncomingConnectionFailed(account: PhoneAccountHandle?, request: ConnectionRequest) {
+        val extras = request.extras.getBundle(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS) ?: request.extras
+        extras.getString(TelecomCallSystem.EXTRA_CALL_ID)?.let { CallRinger.send(it, CallRinger.Action.MISSED) }
     }
 
     override fun onCreateOutgoingConnection(account: PhoneAccountHandle?, request: ConnectionRequest): Connection {
@@ -45,19 +56,17 @@ class ZapaConnectionService : ConnectionService() {
 
         override fun onShowIncomingCallUi() = Unit // the full-screen notification is already up
 
-        override fun onAnswer() {
-            setActive()
-            CallRinger.handler?.accept(callId)
-        }
+        // Telecom hears "active" only once the call controller has the answer (CallRinger.onAccepted).
+        override fun onAnswer() = CallRinger.send(callId, CallRinger.Action.ACCEPT)
 
         override fun onReject() {
             finish(DisconnectCause.REJECTED)
-            CallRinger.handler?.decline(callId)
+            CallRinger.send(callId, CallRinger.Action.DECLINE)
         }
 
         override fun onDisconnect() {
             finish(DisconnectCause.LOCAL)
-            CallRinger.handler?.hangup(callId)
+            CallRinger.send(callId, CallRinger.Action.HANGUP)
         }
 
         fun finish(cause: Int) {
@@ -77,19 +86,10 @@ class ZapaConnectionService : ConnectionService() {
         fun active(callId: String) {
             connections[callId]?.setActive()
         }
+
+        /** An answer no call controller took: end it with an error rather than leave Telecom thinking it's live. */
+        fun fail(callId: String) {
+            (connections[callId] as? ZapaConnection)?.finish(DisconnectCause.ERROR)
+        }
     }
-}
-
-/** What Telecom and the ringing notification ask of the app's call controller. */
-interface CallRingerHandler {
-    fun accept(callId: String)
-
-    fun decline(callId: String)
-
-    fun hangup(callId: String)
-}
-
-object CallRinger {
-    @Volatile
-    var handler: CallRingerHandler? = null
 }
