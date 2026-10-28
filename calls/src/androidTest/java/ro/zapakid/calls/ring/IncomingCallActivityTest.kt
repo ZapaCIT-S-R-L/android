@@ -51,4 +51,27 @@ class IncomingCallActivityTest {
         }
         assertEquals(listOf("decline call-1"), seen)
     }
+
+    // Review of #46, item 5: on an unlocked phone Answer goes straight through (locked: requestDismissKeyguard first).
+    @Test
+    fun answerOnAnUnlockedPhoneReachesTheApp() {
+        CallRinger.handler =
+            object : CallRingerHandler {
+                override fun accept(callId: String) {
+                    seen += "accept $callId"
+                }
+
+                override fun decline(callId: String) = Unit
+
+                override fun hangup(callId: String) = Unit
+            }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<IncomingCallActivity>(
+            IncomingCallActivity.intent(context, "call-2", ConversationTitle("Mum", 4, false))
+        ).use {
+            compose.onNodeWithContentDescription("Answer").performClick()
+            compose.waitUntil(5_000) { seen.isNotEmpty() }
+        }
+        assertEquals(listOf("accept call-2"), seen)
+    }
 }
