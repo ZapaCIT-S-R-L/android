@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -20,7 +21,8 @@ interface DeviceApi {
     /** @return the libsignal device ID (1..127) the server gave this phone. */
     suspend fun register(token: String, keys: DeviceKeys): Int
 
-    suspend fun accountHasIdentity(token: String, accountId: String): Boolean
+    /** The account's registered public identity key, or null when it has none yet. */
+    suspend fun accountIdentityKey(token: String, accountId: String): ByteArray?
 }
 
 class HttpDeviceApi(private val baseUrl: HttpUrl, private val client: OkHttpClient) : DeviceApi {
@@ -38,12 +40,15 @@ class HttpDeviceApi(private val baseUrl: HttpUrl, private val client: OkHttpClie
         return deviceId
     }
 
-    override suspend fun accountHasIdentity(token: String, accountId: String): Boolean = try {
-        execute(request("accounts/$accountId/identity", token).get().build())
-        true
+    @Serializable
+    private class AccountIdentity(val identityKey: String)
+
+    override suspend fun accountIdentityKey(token: String, accountId: String): ByteArray? = try {
+        val text = execute(request("accounts/$accountId/identity", token).get().build())
+        Base64.getDecoder().decode(json.decodeFromString(AccountIdentity.serializer(), text).identityKey)
     } catch (e: AuthApiException) {
         if (e.status != HTTP_NOT_FOUND) throw e
-        false
+        null
     }
 
     private fun request(path: String, token: String) = Request

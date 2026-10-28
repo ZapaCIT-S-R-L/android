@@ -76,7 +76,7 @@ class AppGraph(
     val deviceRegistration: DeviceRegistrar by lazy {
         deviceRegistrar ?: DeviceRegistration(
             records = keyRecords,
-            backup = BlockStoreIdentityBackup(PlayBlockStoreApi(app)),
+            backup = { BlockStoreIdentityBackup(PlayBlockStoreApi(app), it) },
             api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http),
             session = authRepository::currentSession,
             // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
