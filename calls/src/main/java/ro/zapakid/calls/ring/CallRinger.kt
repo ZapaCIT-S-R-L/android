@@ -74,7 +74,9 @@ object CallRinger {
         }
 
         Action.DECLINE -> to.decline(callId)
+
         Action.HANGUP -> to.hangup(callId)
+
         Action.MISSED -> to.missed(callId)
     }
 
@@ -91,23 +93,29 @@ object CallRinger {
 
 /** How an incoming call reaches the user: Telecom when allowed, our notification otherwise, missed when neither can. */
 internal object IncomingRouting {
-    fun report(
-        canRing: Boolean,
-        telecomAllowed: Boolean,
-        register: () -> Unit,
-        addToTelecom: () -> Unit,
-        notify: () -> Unit,
-        missed: () -> Unit
-    ) {
+    /** The ways an incoming call can go. */
+    interface Ways {
+        fun register()
+
+        fun addToTelecom()
+
+        fun showNotification()
+
+        fun missed()
+    }
+
+    fun report(canRing: Boolean, telecomAllowed: Boolean, ways: Ways) {
         when {
-            !canRing -> missed()
-            !telecomAllowed -> notify()
+            !canRing -> ways.missed()
+
+            !telecomAllowed -> ways.showNotification()
+
             else ->
                 try {
-                    register()
-                    addToTelecom()
+                    ways.register()
+                    ways.addToTelecom()
                 } catch (_: SecurityException) {
-                    notify() // the phone account isn't registered or usable in this process
+                    ways.showNotification() // the phone account isn't registered or usable in this process
                 }
         }
     }
