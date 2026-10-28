@@ -17,7 +17,7 @@ echo "== Gradle: build, unit tests, lint"
 python3 - <<'PY'
 import glob, re
 t = f = 0
-for x in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+for x in glob.glob("*/build/test-results/testDebugUnitTest/*.xml"):
     m = re.search(r'tests="(\d+)" skipped="\d+" failures="(\d+)" errors="(\d+)"', open(x).read())
     t += int(m[1]); f += int(m[2]) + int(m[3])
 print(f"unit tests: {t} run, {f} failed")
