@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-reports
-          path: app/build/reports/tests/
+          path: "*/build/reports/tests/"
 
   ui:
     if: github.event_name != 'schedule'
@@ -94,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ui-test-reports
-          path: app/build/reports/androidTests/
+          path: "*/build/reports/androidTests/"
 
   lint:
     if: github.event_name != 'schedule'
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lint-reports
-          path: app/build/reports/
+          path: "*/build/reports/"
 
   scripts:
     if: github.event_name != 'schedule'
