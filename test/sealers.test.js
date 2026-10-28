@@ -30,3 +30,11 @@ test("the shared test fakes are not part of any shipped source set", () => {
     }
   }
 });
+
+test("a function returning a sealer is not an implementation (review of #46, item 6)", () => {
+  assert.equal(implementsSealer("fun sealer(): CallKeySealer = real"), null);
+  assert.equal(implementsSealer("private fun make(a: Int, b: String): MessageSealer {"), null);
+  assert.equal(implementsSealer("class A(val b: Int) : CallKeySealer {"), "CallKeySealer");
+  assert.equal(implementsSealer("class A(\n    val b: Int\n) : Base(), MessageSealer {"), "MessageSealer");
+  assert.equal(implementsSealer("object Fake : CallKeySealer {"), "CallKeySealer");
+});
