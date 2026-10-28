@@ -27,8 +27,13 @@ class KidFamilyTest {
 
             override suspend fun join(token: String, code: String) = error("parents only")
 
-            override suspend fun addKid(token: String, familyId: String, nickname: String, avatar: String, grade: Int?) =
-                error("parents only")
+            override suspend fun addKid(
+                token: String,
+                familyId: String,
+                nickname: String,
+                avatar: String,
+                grade: Int?
+            ) = error("parents only")
 
             override suspend fun pairKid(token: String, familyId: String, kidId: String) = error("parents only")
 

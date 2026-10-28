@@ -110,7 +110,7 @@ private fun LogRow(entry: CallLogEntry, avatar: Int, now: () -> Long, onCallBack
             Icon(
                 painterResource(R.drawable.ic_call),
                 contentDescription = stringResource(R.string.call_log_call_again, entry.title),
-                tint = AcceptGreen
+                tint = acceptColor()
             )
         }
     }

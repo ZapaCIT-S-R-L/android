@@ -16,7 +16,12 @@ class FamilyMembersScreenTest {
     @Test
     fun showsEveryMemberAndNoManageButtons() {
         val family =
-            Family("f1", "Pop", parents = listOf(FamilyParent("p1", "Ana")), kids = listOf(Kid("k1", "Mia", "robot-3", 2), Kid("k2", "Ion", "robot-1", -1)))
+            Family(
+                "f1",
+                "Pop",
+                parents = listOf(FamilyParent("p1", "Ana")),
+                kids = listOf(Kid("k1", "Mia", "robot-3", 2), Kid("k2", "Ion", "robot-1", -1))
+            )
         compose.setContent { MaterialTheme { FamilyMembersScreen(family) } }
 
         compose.onNodeWithText("Ana").assertIsDisplayed()

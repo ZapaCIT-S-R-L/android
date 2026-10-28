@@ -1,141 +1,182 @@
 package ro.zapakid.calls.ui
 
 /**
- * The two ZapaKid looks, as plain ARGB values so they can be checked without Android:
- * - parents, "Calm & modern": soft mint and lavender on off-white, thin lines, small corners;
- * - kids, "Playful & bright": warm yellow and sky blue, chunky rounded cards, big targets.
- * Every text/background pair used by the Material roles meets WCAG AA (4.5:1), in light and dark.
+ * The two ZapaKid looks, with the iOS app's tokens exactly (so both apps look the same), as plain ARGB values that
+ * can be checked without Android:
+ * - parents, "Calm & modern": mint and lavender on off-white, thin lines, 14 dp corners, no shadows;
+ * - kids, "Playful & bright": warm yellow and sky blue, chunky 24 dp cards, soft shadows, sparkles.
  */
 enum class UserRole { Parent, Kid }
 
 data class Palette(
+    val background: Long,
+    val surface: Long,
+    val separator: Long,
+    val text: Long,
+    val secondaryText: Long,
+    /** Links, toggles, text buttons. */
+    val accent: Long,
+    val onAccent: Long,
     val primary: Long,
     val onPrimary: Long,
-    val primaryContainer: Long,
-    val onPrimaryContainer: Long,
     val secondary: Long,
     val onSecondary: Long,
-    val secondaryContainer: Long,
-    val onSecondaryContainer: Long,
-    val tertiaryContainer: Long,
-    val onTertiaryContainer: Long,
-    val background: Long,
-    val onBackground: Long,
-    val surface: Long,
-    val onSurface: Long,
-    val surfaceVariant: Long,
-    val onSurfaceVariant: Long,
-    val outline: Long,
-    val error: Long,
-    val onError: Long
+    val myBubble: Long,
+    val myText: Long,
+    val theirBubble: Long,
+    val theirText: Long,
+    val callButton: Long,
+    val callIcon: Long,
+    val hangUp: Long,
+    val hangUpIcon: Long,
+    val speakingRing: Long,
+    /** Kids' chat cards (parents don't use them). */
+    val cardTints: List<Long>,
+    val accept: Long = 0xFF218C4A,
+    val onAccept: Long = 0xFFFFFFFF
 ) {
-    /** Text on background pairs that must be readable. */
+    /** Text on background pairs: WCAG AA 4.5:1. */
     fun readablePairs(): List<Triple<String, Long, Long>> = listOf(
-        Triple("primary", onPrimary, primary),
-        Triple("primaryContainer", onPrimaryContainer, primaryContainer),
-        Triple("secondary", onSecondary, secondary),
-        Triple("secondaryContainer", onSecondaryContainer, secondaryContainer),
-        Triple("tertiaryContainer", onTertiaryContainer, tertiaryContainer),
-        Triple("background", onBackground, background),
-        Triple("surface", onSurface, surface),
-        Triple("surfaceVariant", onSurfaceVariant, surfaceVariant),
-        Triple("primary on surface (text buttons)", primary, surface),
-        Triple("error", onError, error),
-        Triple("error on surface", error, surface)
+        Triple("text on background", text, background),
+        Triple("text on surface", text, surface),
+        Triple("secondary text on background", secondaryText, background),
+        Triple("secondary text on surface", secondaryText, surface),
+        Triple("accent on surface", accent, surface),
+        Triple("accent on background", accent, background),
+        Triple("on accent", onAccent, accent),
+        Triple("on primary", onPrimary, primary),
+        Triple("on secondary", onSecondary, secondary),
+        Triple("my bubble", myText, myBubble),
+        Triple("their bubble", theirText, theirBubble),
+        Triple("hang-up", hangUpIcon, hangUp)
+    ) +
+        cardTints.flatMap {
+            listOf(Triple("text on card", text, it), Triple("secondary text on card", secondaryText, it))
+        }
+
+    /** Icon-only buttons: WCAG non-text contrast 3:1 (their labels sit under them, on the background). */
+    fun iconPairs(): List<Triple<String, Long, Long>> = listOf(
+        Triple("call button", callIcon, callButton),
+        Triple("accept call", onAccept, accept),
+        Triple("hang-up", hangUpIcon, hangUp)
     )
+}
+
+/** Corner radius, spacing, minimum tap size and decorations per look. */
+data class Metrics(
+    val cornerDp: Int,
+    val spacingDp: Int,
+    val minTapDp: Int,
+    val shadows: Boolean,
+    val sparkles: Boolean
+) {
+    companion object {
+        private val parent = Metrics(cornerDp = 14, spacingDp = 16, minTapDp = 48, shadows = false, sparkles = false)
+        private val kid = Metrics(cornerDp = 24, spacingDp = 14, minTapDp = 64, shadows = true, sparkles = true)
+
+        fun of(role: UserRole): Metrics = if (role == UserRole.Kid) kid else parent
+    }
 }
 
 object Palettes {
     val parentLight =
         Palette(
-            primary = 0xFF1F7A5C, // deep mint
-            onPrimary = 0xFFFFFFFF,
-            primaryContainer = 0xFFBEEBD8, // soft mint
-            onPrimaryContainer = 0xFF0E3B2C,
-            secondary = 0xFF6A55A8, // lavender
-            onSecondary = 0xFFFFFFFF,
-            secondaryContainer = 0xFFE4DBF7, // soft lavender
-            onSecondaryContainer = 0xFF2A1F4D,
-            tertiaryContainer = 0xFFEDEBE5,
-            onTertiaryContainer = 0xFF2B2D33,
-            background = 0xFFF7F6F2, // off-white
-            onBackground = 0xFF2B2D33,
-            surface = 0xFFFBFAF7,
-            onSurface = 0xFF2B2D33,
-            surfaceVariant = 0xFFEDEBE5,
-            onSurfaceVariant = 0xFF55585F,
-            outline = 0xFFD9D7D0,
-            error = 0xFFB3261E,
-            onError = 0xFFFFFFFF
+            background = 0xFFF7F6F2,
+            surface = 0xFFFFFFFF,
+            separator = 0xFFE4E2DC,
+            text = 0xFF1F2A2E,
+            secondaryText = 0xFF5C6670,
+            accent = 0xFF1F7A62,
+            onAccent = 0xFFFFFFFF,
+            primary = 0xFF9EE3C9,
+            onPrimary = 0xFF14302A,
+            secondary = 0xFFDCD2F5,
+            onSecondary = 0xFF3A2A6B,
+            myBubble = 0xFFCDEFE2,
+            myText = 0xFF1F2A2E,
+            theirBubble = 0xFFECE6FA,
+            theirText = 0xFF1F2A2E,
+            callButton = 0xFF9EE3C9,
+            callIcon = 0xFF14302A,
+            hangUp = 0xFFC93A3A,
+            hangUpIcon = 0xFFFFFFFF,
+            speakingRing = 0xFF3FB58F,
+            cardTints = emptyList()
         )
 
     val parentDark =
         Palette(
-            primary = 0xFF7FD9B6,
-            onPrimary = 0xFF003826,
-            primaryContainer = 0xFF1E5A45,
-            onPrimaryContainer = 0xFFC4F2DE,
-            secondary = 0xFFC7B7F2,
-            onSecondary = 0xFF2E2259,
-            secondaryContainer = 0xFF463A70,
-            onSecondaryContainer = 0xFFE9DFFF,
-            tertiaryContainer = 0xFF2C2F2D,
-            onTertiaryContainer = 0xFFE4E4DF,
-            background = 0xFF151716,
-            onBackground = 0xFFE4E4DF,
-            surface = 0xFF1B1D1C,
-            onSurface = 0xFFE4E4DF,
-            surfaceVariant = 0xFF2C2F2D,
-            onSurfaceVariant = 0xFFC3C6C0,
-            outline = 0xFF4A4E4B,
-            error = 0xFFFFB4AB,
-            onError = 0xFF690005
+            background = 0xFF121416,
+            surface = 0xFF1C1F22,
+            separator = 0xFF2C3034,
+            text = 0xFFECEFF1,
+            secondaryText = 0xFFA7B0B8,
+            accent = 0xFF7FD8B8,
+            onAccent = 0xFF0E1F19,
+            primary = 0xFF7FD8B8,
+            onPrimary = 0xFF0E1F19,
+            secondary = 0xFF3B3360,
+            onSecondary = 0xFFE6DEFF,
+            myBubble = 0xFF1F3D33,
+            myText = 0xFFECEFF1,
+            theirBubble = 0xFF2A2540,
+            theirText = 0xFFECEFF1,
+            callButton = 0xFF7FD8B8,
+            callIcon = 0xFF0E1F19,
+            hangUp = 0xFFB83232,
+            hangUpIcon = 0xFFFFFFFF,
+            speakingRing = 0xFF7FD8B8,
+            cardTints = emptyList()
         )
 
     val kidLight =
         Palette(
-            primary = 0xFF0B6FA4, // sky blue, deep enough for text
-            onPrimary = 0xFFFFFFFF,
-            primaryContainer = 0xFFFFD166, // warm yellow
-            onPrimaryContainer = 0xFF3D2B00,
-            secondary = 0xFF8A5A00, // honey
-            onSecondary = 0xFFFFFFFF,
-            secondaryContainer = 0xFFBDE6FB, // light sky
-            onSecondaryContainer = 0xFF06324A,
-            tertiaryContainer = 0xFFD9F2D9, // soft green card
-            onTertiaryContainer = 0xFF143D14,
-            background = 0xFFFFFBF0,
-            onBackground = 0xFF1F2933,
+            background = 0xFFFFFBEA,
             surface = 0xFFFFFFFF,
-            onSurface = 0xFF1F2933,
-            surfaceVariant = 0xFFFFF1CC, // yellow card
-            onSurfaceVariant = 0xFF4A3B12,
-            outline = 0xFFF2C14E,
-            error = 0xFFB3261E,
-            onError = 0xFFFFFFFF
+            separator = 0xFFF2E3A6,
+            text = 0xFF2B2B2B,
+            secondaryText = 0xFF5A5A5A,
+            accent = 0xFF1A6FAA,
+            onAccent = 0xFFFFFFFF,
+            primary = 0xFFFFD54A,
+            onPrimary = 0xFF3A2E00,
+            secondary = 0xFF4FB3F0,
+            onSecondary = 0xFF0B2A40,
+            myBubble = 0xFFCDEBFF,
+            myText = 0xFF13324A,
+            theirBubble = 0xFFFFF1B8,
+            theirText = 0xFF3A2E00,
+            callButton = 0xFF1A6FAA,
+            callIcon = 0xFFFFFFFF,
+            hangUp = 0xFFC93A3A,
+            hangUpIcon = 0xFFFFFFFF,
+            speakingRing = 0xFFF5B700,
+            cardTints = listOf(0xFFFFF4CF, 0xFFE1F2FF, 0xFFE3F6E3, 0xFFFFFFFF)
         )
 
     val kidDark =
         Palette(
-            primary = 0xFF8FD3F7,
-            onPrimary = 0xFF00344F,
-            primaryContainer = 0xFF6B4E00,
-            onPrimaryContainer = 0xFFFFE3A3,
-            secondary = 0xFFFFD166,
-            onSecondary = 0xFF3D2B00,
-            secondaryContainer = 0xFF0E4A6B,
-            onSecondaryContainer = 0xFFCDEBFC,
-            tertiaryContainer = 0xFF1F4A1F,
-            onTertiaryContainer = 0xFFD2F2D2,
-            background = 0xFF1B1A17,
-            onBackground = 0xFFF2EEE3,
-            surface = 0xFF23211D,
-            onSurface = 0xFFF2EEE3,
-            surfaceVariant = 0xFF3A3424,
-            onSurfaceVariant = 0xFFE8DDBF,
-            outline = 0xFF8C7A45,
-            error = 0xFFFFB4AB,
-            onError = 0xFF690005
+            background = 0xFF1A1A2E,
+            surface = 0xFF24243A,
+            separator = 0xFF3A3A55,
+            text = 0xFFF5F5F5,
+            secondaryText = 0xFFB9B9C9,
+            accent = 0xFF8CCBFF,
+            onAccent = 0xFF0B2A40,
+            primary = 0xFFFFD54A,
+            onPrimary = 0xFF3A2E00,
+            secondary = 0xFF4FB3F0,
+            onSecondary = 0xFF0B2A40,
+            myBubble = 0xFF1D3B57,
+            myText = 0xFFF5F5F5,
+            theirBubble = 0xFF4A3F12,
+            theirText = 0xFFF5F5F5,
+            callButton = 0xFF1A6FAA,
+            callIcon = 0xFFFFFFFF,
+            hangUp = 0xFFB83232,
+            hangUpIcon = 0xFFFFFFFF,
+            speakingRing = 0xFFFFD54A,
+            cardTints = listOf(0xFF33304A, 0xFF23344D, 0xFF24402F, 0xFF24243A)
         )
 
     fun of(role: UserRole, dark: Boolean): Palette = when (role) {
