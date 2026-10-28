@@ -42,15 +42,15 @@ class DeviceRegistration(
     override suspend fun register(): Result {
         val current = session() ?: return Result.Failed(Error.SIGNED_OUT)
         val records = accounts.records(current.parent.id)
-        if (records.get(KIND, SESSION)?.contentEquals(sessionHash(current.token)) == true) {
-            records.get(KIND, DEVICE_ID)?.let { return Result.Registered(ByteBuffer.wrap(it).int) }
-        } else {
+        val bound = records.get(KIND, SESSION)?.contentEquals(sessionHash(current.token)) == true
+        if (!bound) {
             // Another session registered (or started to): the server doesn't know this one. New device, new keys.
             records.remove(KIND, DEVICE_ID)
             records.remove(KIND, PENDING_KEYS)
             records.remove(KIND, SESSION)
         }
-        return registerWith(current, records)
+        return records.get(KIND, DEVICE_ID)?.let { Result.Registered(ByteBuffer.wrap(it).int) }
+            ?: registerWith(current, records)
     }
 
     @Suppress("SwallowedException") // errors become results
