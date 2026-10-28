@@ -43,12 +43,12 @@ class DeviceRegistration(
     @Suppress("SwallowedException") // errors become results
     private suspend fun registerWith(current: Session, records: EncryptedRecordStore): Result =
         try {
-            val hasIdentity = api.accountHasIdentity(current.token, current.parent.id)
+            val registered = api.accountIdentityKey(current.token, current.parent.id)
             when (
                 val state = LocalIdentity(
                     records,
                     accounts.backup(current.parent.id)
-                ).resolve(hasIdentity, reshare)
+                ).resolveVerified(registered, reshare)
             ) {
                 LocalIdentity.State.WaitingForReshare -> Result.WaitingForReshare
                 is LocalIdentity.State.Ready -> upload(current.token, state.identity, records)
