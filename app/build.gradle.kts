@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.play.age.signals)
     implementation(libs.play.integrity)
     implementation(libs.libsignal.android)
+    implementation(libs.play.services.blockstore)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.browser)
     implementation(libs.zxing.core)

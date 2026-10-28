@@ -17,6 +17,7 @@ googleid = "1.2.1"
 age-signals = "0.0.4"
 play-integrity = "1.6.0"
 libsignal = "0.106.0"
+blockstore = "16.4.0"
 desugar-jdk-libs = "2.1.5"
 okhttp = "5.5.1"
 kotlinx-serialization = "1.12.0"
@@ -46,6 +47,7 @@ googleid = { module = "com.google.android.libraries.identity.googleid:googleid",
 play-age-signals = { module = "com.google.android.play:age-signals", version.ref = "age-signals" }
 play-integrity = { module = "com.google.android.play:integrity", version.ref = "play-integrity" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar-jdk-libs" }
+play-services-blockstore = { module = "com.google.android.gms:play-services-auth-blockstore", version.ref = "blockstore" }
 libsignal-android = { module = "org.signal:libsignal-android", version.ref = "libsignal" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
