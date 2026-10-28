@@ -5,4 +5,29 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <!-- Ringing: Telecom self-managed calls, a full-screen incoming call and the ringing notification. -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <service
+            android:name="ro.zapakid.calls.ring.ZapaConnectionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name="ro.zapakid.calls.ring.CallActionReceiver"
+            android:exported="false" />
+        <activity
+            android:name="ro.zapakid.calls.ring.IncomingCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="ro.zapakid.calls.incoming" />
+    </application>
 </manifest>
