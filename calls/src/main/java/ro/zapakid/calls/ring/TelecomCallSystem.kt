@@ -39,10 +39,16 @@ class TelecomCallSystem(
     override fun reportIncoming(callId: String, title: ConversationTitle) = IncomingRouting.report(
         canRing = CallNotifications.canRing(context),
         telecomAllowed = allowed(),
-        register = ::register,
-        addToTelecom = { addIncoming(callId, title) },
-        notify = { CallNotifications.showIncoming(context, callId, title) },
-        missed = { CallRinger.send(callId, CallRinger.Action.MISSED) }
+        ways =
+            object : IncomingRouting.Ways {
+                override fun register() = this@TelecomCallSystem.register()
+
+                override fun addToTelecom() = addIncoming(callId, title)
+
+                override fun showNotification() = CallNotifications.showIncoming(context, callId, title)
+
+                override fun missed() = CallRinger.send(callId, CallRinger.Action.MISSED)
+            }
     )
 
     private fun addIncoming(callId: String, title: ConversationTitle) {
