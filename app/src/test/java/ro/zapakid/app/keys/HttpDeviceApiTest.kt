@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -10,12 +11,15 @@ import mockwebserver3.MockWebServer
 import okhttp3.Headers.Companion.headersOf
 import okhttp3.OkHttpClient
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.signal.libsignal.protocol.IdentityKeyPair
 import ro.zapakid.app.auth.AuthApiException
 import ro.zapakid.app.testing.ContractRecorder
 
@@ -128,10 +132,13 @@ class HttpDeviceApiTest {
     }
 
     @Test
-    fun theAccountsIdentityExistsWhenTheKeyDirectoryHasOne() = runTest {
-        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQidentity","changes":[]}"""))
-        assertTrue(
-            api.accountHasIdentity(
+    fun theAccountsRegisteredIdentityKeyComesFromTheKeyDirectory() = runTest {
+        val key = IdentityKeyPair.generate().publicKey.serialize()
+        val body = """{"identityKey":"${Base64.getEncoder().encodeToString(key)}","changes":[]}"""
+        server.enqueue(MockResponse(code = 200, body = body))
+        assertArrayEquals(
+            key,
+            api.accountIdentityKey(
                 "zks_tok0000000000000000000000000000000000000000",
                 "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
             )
@@ -148,8 +155,8 @@ class HttpDeviceApiTest {
                 body = """{"error":{"code":"not_found","message":"x"}}"""
             )
         )
-        assertFalse(
-            api.accountHasIdentity(
+        assertNull(
+            api.accountIdentityKey(
                 "zks_tok0000000000000000000000000000000000000000",
                 "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
             )
