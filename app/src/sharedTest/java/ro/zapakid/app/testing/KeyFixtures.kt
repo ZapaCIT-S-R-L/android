@@ -19,19 +19,20 @@ import ro.zapakid.app.keys.ZapaKidProtocolStore
 class Phone(
     val dir: File,
     val cipher: TestBlobCipher = TestBlobCipher(),
-    val backup: FakeBlockStore = FakeBlockStore()
+    val backup: FakeBlockStore = FakeBlockStore(),
+    val account: String = "account-a"
 ) {
     val records = EncryptedRecordStore(dir, cipher)
     val identity =
         (
             runBlocking {
-                LocalIdentity(records, BlockStoreIdentityBackup(backup)).resolve(false, NoReshare)
+                LocalIdentity(records, BlockStoreIdentityBackup(backup, account)).resolve(false, NoReshare)
             } as LocalIdentity.State.Ready
             )
             .identity
     val store = ZapaKidProtocolStore(records, identity)
 
-    fun reopen() = Phone(dir, cipher, backup)
+    fun reopen() = Phone(dir, cipher, backup, account)
 }
 
 /** Block Store on the JVM: a map, and whether Google's end-to-end encrypted cloud backup is available. */
@@ -41,14 +42,28 @@ class FakeBlockStore(var endToEndEncryption: Boolean = true) : BlockStoreApi {
     val items = mutableMapOf<String, Item>()
     var stores = 0
 
-    override suspend fun isEndToEndEncryptionAvailable(): Boolean = endToEndEncryption
+    /** No Google Play services, or an ApiException: every call throws. */
+    var failing = false
+
+    private fun check() {
+        if (failing) throw IllegalStateException("Block Store unavailable")
+    }
+
+    override suspend fun isEndToEndEncryptionAvailable(): Boolean {
+        check()
+        return endToEndEncryption
+    }
 
     override suspend fun store(key: String, bytes: ByteArray, backupToCloud: Boolean) {
+        check()
         stores++
         items[key] = Item(bytes.copyOf(), backupToCloud)
     }
 
-    override suspend fun retrieve(key: String): ByteArray? = items[key]?.bytes?.copyOf()
+    override suspend fun retrieve(key: String): ByteArray? {
+        check()
+        return items[key]?.bytes?.copyOf()
+    }
 }
 
 object NoReshare : IdentityReshare {

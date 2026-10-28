@@ -17,7 +17,8 @@ fun interface DeviceRegistrar {
  */
 class DeviceRegistration(
     private val records: EncryptedRecordStore,
-    private val backup: IdentityBackup,
+    /** The Block Store copy for an account ID ([BlockStoreIdentityBackup]); one item per account. */
+    private val backup: (accountId: String) -> IdentityBackup,
     private val api: DeviceApi,
     private val session: () -> Session?,
     private val reshare: IdentityReshare,
@@ -46,8 +47,8 @@ class DeviceRegistration(
     @Suppress("SwallowedException") // errors become results
     private suspend fun registerWith(current: Session): Result =
         try {
-            val hasIdentity = api.accountHasIdentity(current.token, current.parent.id)
-            when (val state = LocalIdentity(records, backup).resolve(hasIdentity, reshare)) {
+            val registered = api.accountIdentityKey(current.token, current.parent.id)
+            when (val state = LocalIdentity(records, backup(current.parent.id)).resolveVerified(registered, reshare)) {
                 LocalIdentity.State.WaitingForReshare -> Result.WaitingForReshare
                 is LocalIdentity.State.Ready -> upload(current.token, state.identity)
             }
