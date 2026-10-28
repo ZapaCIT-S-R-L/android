@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call phases -->
+    <string name="call_calling">Calling…</string>
+    <string name="call_ringing">is calling you!</string>
+    <string name="call_ringing_group">Group call!</string>
+    <string name="call_connecting">Connecting…</string>
+    <string name="call_reconnecting">Lost the connection. Trying again…</string>
+    <string name="call_in_call">In call</string>
+    <string name="call_encrypted">Only you and your family can hear this call</string>
+    <plurals name="call_people_count">
+        <item quantity="one">%1$d person in the call</item>
+        <item quantity="other">%1$d people in the call</item>
+    </plurals>
+    <!-- Ended -->
+    <string name="call_ended">Call ended</string>
+    <string name="call_ended_declined">They can\'t talk right now</string>
+    <string name="call_ended_no_answer">Nobody answered. Try again later!</string>
+    <string name="call_ended_missed">You missed a call</string>
+    <string name="call_ended_everyone_left">Everyone has left the call</string>
+    <string name="call_ended_connection">The connection was lost</string>
+    <string name="call_ended_failed">The call didn\'t work. Try again.</string>
+    <string name="call_close">Close</string>
+    <!-- Buttons (also read by TalkBack) -->
+    <string name="call_accept">Answer</string>
+    <string name="call_decline">Decline</string>
+    <string name="call_end">End call</string>
+    <string name="call_mute">Microphone</string>
+    <string name="call_speaker">Speaker</string>
+    <string name="call_on">On</string>
+    <string name="call_off">Off</string>
+    <string name="call_speaking">talking</string>
+    <!-- Call log -->
+    <string name="call_log_title">Calls</string>
+    <string name="call_log_empty">No calls yet. Call someone from your family!</string>
+    <string name="call_log_missed">Missed</string>
+    <string name="call_log_incoming">Incoming</string>
+    <string name="call_log_outgoing">Outgoing</string>
+    <string name="call_log_call_again">Call %1$s</string>
+    <string name="call_log_duration">%1$d:%2$02d</string>
+    <!-- Permissions -->
+    <string name="permission_mic_title">Let ZapaKid use the microphone</string>
+    <string name="permission_mic_body">So your family can hear you when you call. ZapaKid only listens during a call, and never records it.</string>
+    <string name="permission_notifications_title">Let ZapaKid ring</string>
+    <string name="permission_notifications_body">So your phone can ring when your family calls you.</string>
+    <string name="permission_allow">OK, allow</string>
+    <string name="permission_not_now">Not now</string>
+    <string name="permission_mic_denied">Without the microphone nobody can hear you. You can turn it on in Settings.</string>
+</resources>
