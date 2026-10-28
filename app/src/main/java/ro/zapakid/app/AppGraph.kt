@@ -14,7 +14,7 @@ import ro.zapakid.app.auth.AuthApi
 import ro.zapakid.app.auth.AuthRepository
 import ro.zapakid.app.auth.EncryptedSessionStore
 import ro.zapakid.app.auth.HttpAuthApi
-import ro.zapakid.app.auth.KeystoreSessionCipher
+import ro.zapakid.app.auth.KeystoreBlobCipher
 import ro.zapakid.app.auth.PlayAgeSignalsSource
 import ro.zapakid.app.auth.PlayIntegrityAttestation
 import ro.zapakid.app.auth.SessionStore
@@ -61,7 +61,7 @@ class AppGraph(
                     http,
                     PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
                 ),
-            store = store ?: EncryptedSessionStore(File(app.noBackupFilesDir, "session.bin"), KeystoreSessionCipher()),
+            store = store ?: EncryptedSessionStore(File(app.noBackupFilesDir, "session.bin"), KeystoreBlobCipher()),
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
             appleConfig = appleConfig
         )
