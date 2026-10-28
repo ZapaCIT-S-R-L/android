@@ -14,6 +14,7 @@ android {
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {
@@ -25,6 +26,12 @@ android {
         abortOnError = true
         warningsAsErrors = true
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    }
+
+    sourceSets {
+        // Fakes shared by the JVM tests and the emulator tests (calls service, event socket, media engine).
+        getByName("test").kotlin.directories.add("src/sharedTest/java")
+        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
     }
 
     testOptions {
@@ -48,10 +55,15 @@ ktlint {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.webrtc)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
