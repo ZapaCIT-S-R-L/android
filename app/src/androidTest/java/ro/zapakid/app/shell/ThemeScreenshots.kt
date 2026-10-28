@@ -87,9 +87,17 @@ class ThemeScreenshots {
             ZapaKidTheme(role = role, darkTheme = false) {
                 when (screen) {
                     "chats" -> ConversationListScreen(chats) {}
+
                     "chat" -> ChatScreen(chats[0], messages, recording = false, actions = NoChat)
+
                     "call" -> CallScreen(call, NoCall)
-                    else -> FamilyScreen(family, {}, { _, _, _ -> }, {}, {}, {})
+
+                    else ->
+                        if (role == UserRole.Kid) {
+                            ro.zapakid.app.family.FamilyMembersScreen(family.family)
+                        } else {
+                            FamilyScreen(family, {}, { _, _, _ -> }, {}, {}, {})
+                        }
                 }
             }
         }

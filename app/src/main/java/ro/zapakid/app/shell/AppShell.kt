@@ -4,6 +4,7 @@ package ro.zapakid.app.shell
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import ro.zapakid.app.R
 import ro.zapakid.calls.CallState
 import ro.zapakid.calls.CallUiState
@@ -48,7 +50,8 @@ fun AppShell(
         return
     }
     var tab by rememberSaveable { mutableStateOf(Tab.Chats) }
-    val tabs = if (kid) listOf(Tab.Chats, Tab.Calls) else Tab.entries
+    // Kids see their family too, read-only (the family slot decides what it shows).
+    val tabs = Tab.entries
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -56,7 +59,13 @@ fun AppShell(
                     NavigationBarItem(
                         selected = tab == t,
                         onClick = { tab = t },
-                        icon = { Icon(painterResource(t.icon), contentDescription = null) },
+                        icon = {
+                            Icon(
+                                painterResource(t.icon),
+                                contentDescription = null,
+                                modifier = Modifier.size(if (kid) KID_ICON else ICON)
+                            )
+                        },
                         label = { Text(stringResource(t.label)) },
                         modifier = Modifier.testTag(t.tag)
                     )
@@ -73,3 +82,6 @@ fun AppShell(
         }
     }
 }
+
+private val ICON = 24.dp
+private val KID_ICON = 30.dp

@@ -34,13 +34,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ro.zapakid.calls.R
 
-internal val AcceptGreen = Color(0xFF1FA463)
-internal val EndRed = Color(0xFFE5383B)
 internal val BigButton = 84.dp
 internal val KidButton = 96.dp
 
 @Composable
 internal fun buttonSize() = if (LocalUserRole.current.playful) KidButton else BigButton
+
+/** Accept (green), hang up (red) and their icons, from the look's tokens. */
+@Composable
+internal fun acceptColor() = Color(LocalPalette.current.accept)
+
+@Composable
+internal fun hangUpColor() = Color(LocalPalette.current.hangUp)
 
 /** A big round button with its label under it; one haptic tick per press. */
 @Composable
@@ -50,7 +55,8 @@ internal fun RoundButton(
     color: Color,
     tag: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconTint: Color = Color.White
 ) {
     val haptics = LocalHapticFeedback.current
     Column(
@@ -82,7 +88,7 @@ internal fun RoundButton(
                     },
             contentAlignment = Alignment.Center
         ) {
-            Icon(painterResource(icon), contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
+            Icon(painterResource(icon), contentDescription = null, tint = iconTint, modifier = Modifier.size(40.dp))
         }
         Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
     }
@@ -100,8 +106,9 @@ internal fun ToggleButton(
 ) {
     val haptics = LocalHapticFeedback.current
     val state = stringResource(if (on) R.string.call_on else R.string.call_off)
-    val background = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val tint = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val palette = LocalPalette.current
+    val background = if (on) Color(palette.callButton) else MaterialTheme.colorScheme.surfaceVariant
+    val tint = if (on) Color(palette.callIcon) else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
         modifier =
             modifier

@@ -136,6 +136,23 @@ class KidPairingViewModel(
             }
     }
 
+    private val mutableFamily = MutableStateFlow<Family?>(null)
+
+    /** The kid's own family, read with the kid session (GET /v1/families). */
+    val family: StateFlow<Family?> = mutableFamily
+
+    @Suppress("TooGenericExceptionCaught", "SwallowedException") // offline: the tab keeps its spinner
+    suspend fun loadFamily() {
+        val session = store.load() ?: return
+        try {
+            mutableFamily.value = api.families(session.token).firstOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            mutableFamily.value = null
+        }
+    }
+
     fun tryAgain() {
         mutableState.value = KidPairingState.Waiting
     }

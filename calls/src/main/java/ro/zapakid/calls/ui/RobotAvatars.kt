@@ -40,8 +40,6 @@ object RobotAvatars {
         )
 }
 
-private val SpeakingGreen = Color(0xFF2FBF71)
-
 /**
  * A robot avatar. [speaking] draws a soft, pulsing green ring around it; [ringing] makes rings ripple outwards
  * like a ringing phone. Decorative: the name next to it is what TalkBack reads.
@@ -56,6 +54,7 @@ fun RobotAvatar(
     sparkles: Boolean = false
 ) {
     val color = RobotAvatars.colors[Math.floorMod(index, RobotAvatars.COUNT)]
+    val ring = Color(LocalPalette.current.speakingRing)
     val transition = rememberInfiniteTransition(label = "avatar")
     val pulse by transition.animateFloat(
         initialValue = 0f,
@@ -74,7 +73,7 @@ fun RobotAvatar(
             }
             if (speaking) {
                 val width = 4.dp.toPx() + 3.dp.toPx() * pulse
-                drawCircle(SpeakingGreen, radius = radius + width, style = Stroke(width))
+                drawCircle(ring, radius = radius + width, style = Stroke(width))
             }
             drawCircle(color, radius = radius)
             robotFace(radius)

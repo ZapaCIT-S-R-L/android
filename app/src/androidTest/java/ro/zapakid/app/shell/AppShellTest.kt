@@ -54,11 +54,12 @@ class AppShellTest {
     }
 
     @Test
-    fun kidsGetChatsAndCallsOnly() {
+    fun kidsGetChatsCallsAndAReadOnlyFamily() {
         show(kid = true)
 
-        compose.onNodeWithTag("tab_family").assertDoesNotExist()
         compose.onNodeWithTag("tab_calls").assertIsDisplayed()
+        compose.onNodeWithTag("tab_family").performClick()
+        compose.onNodeWithText("FAMILY").assertIsDisplayed()
     }
 
     @Test
