@@ -119,7 +119,7 @@ class AppGraph(
 
 /** The Keystore cipher of the session store, wrapping the chat database key. */
 private class KeystoreKeyWrapper : ro.zapakid.chat.data.KeyWrapper {
-    private val cipher = KeystoreSessionCipher()
+    private val cipher = KeystoreBlobCipher()
 
     override fun wrap(plain: ByteArray) = cipher.encrypt(plain)
 
