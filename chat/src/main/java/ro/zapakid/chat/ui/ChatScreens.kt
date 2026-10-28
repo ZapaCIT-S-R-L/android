@@ -22,12 +22,14 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -44,8 +47,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ro.zapakid.calls.ui.LocalMetrics
+import ro.zapakid.calls.ui.LocalPalette
 import ro.zapakid.calls.ui.LocalUserRole
 import ro.zapakid.calls.ui.RobotAvatar
 import ro.zapakid.calls.ui.playful
@@ -88,20 +94,24 @@ fun ConversationListScreen(conversations: List<Conversation>, onOpen: (Conversat
             LazyColumn(Modifier.testTag(ChatTags.LIST)) {
                 itemsIndexed(conversations, key = { _, c -> c.id }) { index, c ->
                     val playful = LocalUserRole.current.playful
+                    val metrics = LocalMetrics.current
+                    val tints = LocalPalette.current.cardTints
                     val card =
-                        if (playful) {
+                        if (playful && tints.isNotEmpty()) {
                             Modifier
-                                .padding(vertical = 6.dp)
-                                .shadow(3.dp, MaterialTheme.shapes.large)
-                                .background(kidCardColors()[index % KID_CARDS], MaterialTheme.shapes.large)
-                                .padding(12.dp)
+                                .padding(vertical = (metrics.spacingDp / 2).dp)
+                                .then(
+                                    if (metrics.shadows) Modifier.shadow(3.dp, MaterialTheme.shapes.large) else Modifier
+                                )
+                                .background(Color(tints[index % tints.size]), MaterialTheme.shapes.large)
+                                .padding(metrics.spacingDp.dp)
                         } else {
                             Modifier
                         }
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .heightIn(min = if (playful) 88.dp else 72.dp)
+                            .heightIn(min = maxOf(metrics.minTapDp, MIN_ROW).dp)
                             .clickable { onOpen(c) }
                             .then(card)
                             .testTag(ChatTags.ROW),
@@ -253,73 +263,67 @@ fun ChatScreen(
 @Composable
 private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image: (Message) -> ImageBitmap?) {
     val mine = message.mine
+    val palette = LocalPalette.current
+    val bubble = Color(if (mine) palette.myBubble else palette.theirBubble)
+    val ink = Color(if (mine) palette.myText else palette.theirText)
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
-        Column(
-            Modifier
-                .widthIn(max = 300.dp)
-                .background(
-                    if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                    MaterialTheme.shapes.large
-                ).padding(12.dp)
-                .testTag(ChatTags.BUBBLE)
-        ) {
-            if (group &&
-                !mine
+        CompositionLocalProvider(LocalContentColor provides ink) {
+            Column(
+                Modifier
+                    .widthIn(max = 300.dp)
+                    .background(bubble, MaterialTheme.shapes.large)
+                    .padding(12.dp)
+                    .testTag(ChatTags.BUBBLE)
             ) {
-                Text(
-                    message.sender,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            when (message.kind) {
-                MessageKind.Text -> Text(message.text.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                if (group &&
+                    !mine
+                ) {
+                    Text(
+                        message.sender,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+                when (message.kind) {
+                    MessageKind.Text -> Text(message.text.orEmpty(), style = MaterialTheme.typography.bodyLarge)
 
-                MessageKind.Image -> {
-                    val bitmap = image(message)
-                    if (bitmap != null) {
-                        androidx.compose.foundation.Image(
-                            bitmap,
-                            contentDescription = stringResource(R.string.chat_photo_received),
-                            modifier = Modifier.widthIn(max = 260.dp)
-                        )
-                    } else {
-                        TextButton({ actions.play(message) }) { Text(stringResource(R.string.chat_photo_open)) }
+                    MessageKind.Image -> {
+                        val bitmap = image(message)
+                        if (bitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap,
+                                contentDescription = stringResource(R.string.chat_photo_received),
+                                modifier = Modifier.widthIn(max = 260.dp)
+                            )
+                        } else {
+                            TextButton({ actions.play(message) }) { Text(stringResource(R.string.chat_photo_open)) }
+                        }
+                    }
+
+                    MessageKind.Voice -> {
+                        val seconds = (message.attachment?.durationMillis ?: 0) / MILLIS
+                        TextButton({ actions.play(message) }, Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.chat_voice_note, seconds))
+                        }
                     }
                 }
+                when (message.status) {
+                    MessageStatus.Sending -> Text(
+                        stringResource(R.string.chat_sending),
+                        style = MaterialTheme.typography.labelSmall
+                    )
 
-                MessageKind.Voice -> {
-                    val seconds = (message.attachment?.durationMillis ?: 0) / MILLIS
-                    TextButton({ actions.play(message) }, Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.chat_voice_note, seconds))
-                    }
+                    MessageStatus.Failed ->
+                        TextButton({
+                            actions.retry(message)
+                        }) { Text(stringResource(R.string.chat_failed), color = MaterialTheme.colorScheme.error) }
+
+                    else -> Unit
                 }
-            }
-            when (message.status) {
-                MessageStatus.Sending -> Text(
-                    stringResource(R.string.chat_sending),
-                    style = MaterialTheme.typography.labelSmall
-                )
-
-                MessageStatus.Failed ->
-                    TextButton({
-                        actions.retry(message)
-                    }) { Text(stringResource(R.string.chat_failed), color = MaterialTheme.colorScheme.error) }
-
-                else -> Unit
             }
         }
     }
 }
 
 private const val MAX_TEXT = 4000
-private const val KID_CARDS = 3
-
-/** Yellow, sky and green cards for the kids' chat list. */
-@Composable
-private fun kidCardColors() = listOf(
-    MaterialTheme.colorScheme.surfaceVariant,
-    MaterialTheme.colorScheme.secondaryContainer,
-    MaterialTheme.colorScheme.tertiaryContainer
-)
+private const val MIN_ROW = 72
 private const val MILLIS = 1000

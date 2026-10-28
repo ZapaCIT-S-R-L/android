@@ -219,14 +219,14 @@ private fun Buttons(state: CallUiState, actions: CallActions) {
                 RoundButton(
                     stringResource(R.string.call_decline),
                     R.drawable.ic_call_end,
-                    EndRed,
+                    hangUpColor(),
                     CallTags.DECLINE,
                     actions::decline
                 )
                 RoundButton(
                     stringResource(R.string.call_accept),
                     R.drawable.ic_call,
-                    AcceptGreen,
+                    acceptColor(),
                     CallTags.ACCEPT,
                     actions::accept
                 )
@@ -253,7 +253,7 @@ private fun Buttons(state: CallUiState, actions: CallActions) {
                 RoundButton(
                     stringResource(R.string.call_end),
                     R.drawable.ic_call_end,
-                    EndRed,
+                    hangUpColor(),
                     CallTags.END,
                     actions::hangup
                 )

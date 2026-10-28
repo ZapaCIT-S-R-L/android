@@ -24,33 +24,39 @@ val LocalUserRole = staticCompositionLocalOf { UserRole.Parent }
 /** Kids get chunky cards, sparkles and bigger targets; parents thin lines and whitespace. */
 val UserRole.playful: Boolean get() = this == UserRole.Kid
 
+/** This look's tokens (the iOS ones): bubbles, call buttons, speaking ring, kids' card tints. */
+val LocalPalette = staticCompositionLocalOf { Palettes.parentLight }
+
+/** This look's corner radius, spacing, minimum tap size, shadows and sparkles. */
+val LocalMetrics = staticCompositionLocalOf { Metrics.of(UserRole.Parent) }
+
 fun colorSchemeOf(palette: Palette, dark: Boolean): ColorScheme {
     fun c(v: Long) = Color(v)
     val base = if (dark) darkColorScheme() else lightColorScheme()
     return base.copy(
-        primary = c(palette.primary),
-        onPrimary = c(palette.onPrimary),
-        primaryContainer = c(palette.primaryContainer),
-        onPrimaryContainer = c(palette.onPrimaryContainer),
+        primary = c(palette.accent),
+        onPrimary = c(palette.onAccent),
+        primaryContainer = c(palette.primary),
+        onPrimaryContainer = c(palette.onPrimary),
         secondary = c(palette.secondary),
         onSecondary = c(palette.onSecondary),
-        secondaryContainer = c(palette.secondaryContainer),
-        onSecondaryContainer = c(palette.onSecondaryContainer),
-        tertiaryContainer = c(palette.tertiaryContainer),
-        onTertiaryContainer = c(palette.onTertiaryContainer),
+        secondaryContainer = c(palette.secondary),
+        onSecondaryContainer = c(palette.onSecondary),
+        tertiaryContainer = c(palette.theirBubble),
+        onTertiaryContainer = c(palette.theirText),
         background = c(palette.background),
-        onBackground = c(palette.onBackground),
+        onBackground = c(palette.text),
         surface = c(palette.surface),
-        onSurface = c(palette.onSurface),
-        surfaceVariant = c(palette.surfaceVariant),
-        onSurfaceVariant = c(palette.onSurfaceVariant),
+        onSurface = c(palette.text),
+        surfaceVariant = c(palette.background),
+        onSurfaceVariant = c(palette.secondaryText),
         surfaceContainer = c(palette.surface),
         surfaceContainerLow = c(palette.background),
-        surfaceContainerHigh = c(palette.surfaceVariant),
-        outline = c(palette.outline),
-        outlineVariant = c(palette.outline),
-        error = c(palette.error),
-        onError = c(palette.onError)
+        surfaceContainerHigh = c(palette.surface),
+        outline = c(palette.separator),
+        outlineVariant = c(palette.separator),
+        error = c(palette.hangUp),
+        onError = c(palette.hangUpIcon)
     )
 }
 
@@ -96,35 +102,35 @@ private fun typographyOf(role: UserRole): Typography {
     }
 }
 
-private fun shapesOf(role: UserRole): Shapes = when (role) {
-    UserRole.Kid ->
-        Shapes(
-            extraSmall = RoundedCornerShape(10.dp),
-            small = RoundedCornerShape(16.dp),
-            medium = RoundedCornerShape(22.dp),
-            large = RoundedCornerShape(28.dp),
-            extraLarge = RoundedCornerShape(36.dp)
-        )
-
-    UserRole.Parent ->
-        Shapes(
-            extraSmall = RoundedCornerShape(4.dp),
-            small = RoundedCornerShape(8.dp),
-            medium = RoundedCornerShape(12.dp),
-            large = RoundedCornerShape(16.dp),
-            extraLarge = RoundedCornerShape(24.dp)
-        )
+private fun shapesOf(metrics: Metrics): Shapes {
+    val corner = metrics.cornerDp.dp
+    return Shapes(
+        extraSmall = RoundedCornerShape(corner / 2),
+        small = RoundedCornerShape(corner),
+        medium = RoundedCornerShape(corner),
+        large = RoundedCornerShape(corner),
+        extraLarge = RoundedCornerShape(corner * EXTRA_LARGE)
+    )
 }
 
 /** The ZapaKid look for [role], light or dark; text sizes still follow the system font scale. */
 @Composable
 fun ZapaTheme(role: UserRole, dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalUserRole provides role) {
+    val palette = Palettes.of(role, dark)
+    val metrics = Metrics.of(role)
+    CompositionLocalProvider(
+        LocalUserRole provides role,
+        LocalPalette provides palette,
+        LocalMetrics provides metrics
+    ) {
         MaterialTheme(
-            colorScheme = colorSchemeOf(Palettes.of(role, dark), dark),
+            colorScheme = colorSchemeOf(palette, dark),
             typography = typographyOf(role),
-            shapes = shapesOf(role),
+            shapes = shapesOf(metrics),
             content = content
         )
     }
 }
+
+/** Sheets and dialogs: one and a half times the card corner. */
+private const val EXTRA_LARGE = 1.5f

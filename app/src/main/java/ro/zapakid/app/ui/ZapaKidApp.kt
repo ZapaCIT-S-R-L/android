@@ -37,8 +37,12 @@ fun ZapaKidApp(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var kidMode by rememberSaveable { mutableStateOf(false) }
     val kidState = kid?.state?.collectAsStateWithLifecycle()?.value
-    if (shell != null && kidState is KidPairingState.Paired) {
-        ro.zapakid.app.shell.ShellRoot(shell, kid = true, family = {})
+    if (shell != null && kid != null && kidState is KidPairingState.Paired) {
+        ro.zapakid.app.shell.ShellRoot(shell, kid = true) {
+            val family by kid.family.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { kid.loadFamily() }
+            ro.zapakid.app.family.FamilyMembersScreen(family)
+        }
         return
     }
     val showKid = kidMode || kidState is KidPairingState.Paired
