@@ -198,6 +198,20 @@ class CallKeyManagerTest {
     }
 
     @Test
+    fun aKeyFromBeforeAJoinIsNotCurrent() = runTest {
+        val phoneA = Phone(a)
+        val phoneB = Phone(b)
+        phoneB.keys.onRoster(listOf(b))
+        assertTrue("alone, my own key is current", phoneB.keys.hasCurrentKey)
+
+        phoneB.keys.onRoster(listOf(a, b))
+        assertFalse("A joined and leads: wait for A's key", phoneB.keys.hasCurrentKey)
+
+        deliver(phoneA.keys.onRoster(listOf(a, b), serverEpoch = 5), phoneB)
+        assertTrue(phoneB.keys.hasCurrentKey)
+    }
+
+    @Test
     fun endingTheCallWipesEveryKey() = runTest {
         val phoneA = Phone(a)
         phoneA.keys.onRoster(listOf(a))
