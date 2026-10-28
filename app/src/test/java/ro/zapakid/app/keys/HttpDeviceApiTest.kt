@@ -191,9 +191,10 @@ class HttpDeviceApiTest {
     fun theIdentityLookupIsNotAttested() = runTest {
         val attestation = FakeAttestation()
         val attested = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client(), attestation)
-        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQidentity","changes":[]}"""))
+        val key = Base64.getEncoder().encodeToString(IdentityKeyPair.generate().publicKey.serialize())
+        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"$key","changes":[]}"""))
 
-        attested.accountHasIdentity(
+        attested.accountIdentityKey(
             "zks_tok0000000000000000000000000000000000000000",
             "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
         )
