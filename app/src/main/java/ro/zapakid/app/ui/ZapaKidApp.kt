@@ -17,7 +17,8 @@ fun ZapaKidApp(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     when (val s = state) {
-        is AuthUiState.SignedOut ->
+        is AuthUiState.SignedOut -> {
+            LaunchedEffect(Unit) { deviceSetup.reset() }
             SignInScreen(
                 busy = s.busy,
                 error = s.error,
@@ -25,11 +26,12 @@ fun ZapaKidApp(
                 onGoogle = { viewModel.signInWithGoogle(google) },
                 onApple = { viewModel.signInWithApple(apple) }
             )
+        }
 
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
 
         is AuthUiState.SignedIn -> {
-            LaunchedEffect(Unit) { deviceSetup.start() }
+            LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
             val device by deviceSetup.state.collectAsStateWithLifecycle()
             HomeScreen(
                 parent = s.parent,
