@@ -77,6 +77,6 @@ class AppGraph(
 
     /** A paired kid phone's session, encrypted like the parent session. */
     val kidSessionStore: KidSessionStore by lazy {
-        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreSessionCipher())
+        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreBlobCipher())
     }
 }
