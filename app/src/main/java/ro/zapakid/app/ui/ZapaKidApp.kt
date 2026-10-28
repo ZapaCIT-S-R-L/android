@@ -41,7 +41,7 @@ fun ZapaKidApp(
         ro.zapakid.app.shell.ShellRoot(shell, kid = true) {
             val family by kid.family.collectAsStateWithLifecycle()
             LaunchedEffect(Unit) { kid.loadFamily() }
-            ro.zapakid.app.family.FamilyMembersScreen(family)
+            ro.zapakid.app.family.FamilyMembersScreen(family, onRetry = kid::loadFamily)
         }
         return
     }

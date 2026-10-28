@@ -17,6 +17,7 @@ import ro.zapakid.app.family.FamilyParent
 import ro.zapakid.app.family.FamilyScreen
 import ro.zapakid.app.family.FamilyUiState
 import ro.zapakid.app.family.Kid
+import ro.zapakid.app.family.KidFamilyState
 import ro.zapakid.app.ui.theme.ZapaKidTheme
 import ro.zapakid.calls.CallPerson
 import ro.zapakid.calls.CallState
@@ -94,7 +95,7 @@ class ThemeScreenshots {
 
                     else ->
                         if (role == UserRole.Kid) {
-                            ro.zapakid.app.family.FamilyMembersScreen(family.family)
+                            ro.zapakid.app.family.FamilyMembersScreen(KidFamilyState.Loaded(family.family!!)) {}
                         } else {
                             FamilyScreen(family, {}, { _, _, _ -> }, {}, {}, {})
                         }

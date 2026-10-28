@@ -17,11 +17,18 @@ class KidFamilyTest {
     private val family = Family("f1", "Pop", parents = listOf(FamilyParent("p1", "Ana")))
     private val tokens = mutableListOf<String>()
 
+    /** What the API answers next; api main (before #74) answers 401 to a kid token. */
+    private var failWith: Exception? = null
+
     private val api =
         object : FamilyApi {
             override suspend fun myFamily(token: String, name: String?) = error("parents only")
 
-            override suspend fun families(token: String) = listOf(family).also { tokens += token }
+            override suspend fun families(token: String): List<Family> {
+                tokens += token
+                failWith?.let { throw it }
+                return listOf(family)
+            }
 
             override suspend fun inviteParent(token: String, familyId: String) = error("parents only")
 
@@ -65,7 +72,36 @@ class KidFamilyTest {
 
         vm.loadFamily()
 
-        assertEquals(family, vm.family.value)
+        assertEquals(KidFamilyState.Loaded(family), vm.family.value)
         assertEquals(listOf("zkk_mia"), tokens)
+    }
+
+    @Test
+    fun aRejectedKidTokenShowsTheErrorAndRetryReads() = runTest {
+        val session = KidSession("zkk_mia", "x", Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1"))
+        val vm = KidPairingViewModel(api, Store(session)) { null }
+        failWith = FamilyApiException(401, "unauthorized", "kid tokens not accepted")
+
+        vm.loadFamily()
+        assertEquals(KidFamilyState.Failed(FamilyError.SERVER), vm.family.value)
+
+        failWith = java.io.IOException("offline")
+        vm.loadFamily()
+        assertEquals(KidFamilyState.Failed(FamilyError.NETWORK), vm.family.value)
+
+        failWith = null
+        vm.loadFamily()
+        assertEquals(KidFamilyState.Loaded(family), vm.family.value)
+        assertEquals(3, tokens.size)
+    }
+
+    @Test
+    fun anUnpairedPhoneStaysLoadingWithoutCallingTheApi() = runTest {
+        val vm = KidPairingViewModel(api, Store(null)) { null }
+
+        vm.loadFamily()
+
+        assertEquals(KidFamilyState.Loading, vm.family.value)
+        assertEquals(emptyList<String>(), tokens)
     }
 }

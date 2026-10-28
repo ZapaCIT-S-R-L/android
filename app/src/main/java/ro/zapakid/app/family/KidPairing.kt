@@ -90,6 +90,15 @@ sealed interface KidPairingState {
     data class Failed(val error: FamilyError) : KidPairingState
 }
 
+/** The kids' Family tab: a spinner, the family, or why it couldn't be read (with a retry). */
+sealed interface KidFamilyState {
+    data object Loading : KidFamilyState
+
+    data class Loaded(val family: Family) : KidFamilyState
+
+    data class Failed(val error: FamilyError) : KidFamilyState
+}
+
 /** The kid's phone: scan the parent's QR, redeem it, keep the kid session. */
 class KidPairingViewModel(
     private val api: FamilyApi,
@@ -136,20 +145,28 @@ class KidPairingViewModel(
             }
     }
 
-    private val mutableFamily = MutableStateFlow<Family?>(null)
+    private val mutableFamily = MutableStateFlow<KidFamilyState>(KidFamilyState.Loading)
 
-    /** The kid's own family, read with the kid session (GET /v1/families). */
-    val family: StateFlow<Family?> = mutableFamily
+    /**
+     * The kid's own family, read with the kid session (GET /v1/families). Needs api #74 (kid-devices): until it
+     * merges the API answers 401 to a kid token and the tab shows the error with a retry button.
+     */
+    val family: StateFlow<KidFamilyState> = mutableFamily
 
-    @Suppress("TooGenericExceptionCaught", "SwallowedException") // offline: the tab keeps its spinner
-    suspend fun loadFamily() {
+    @Suppress("TooGenericExceptionCaught")
+    fun loadFamily() {
         val session = store.load() ?: return
-        try {
-            mutableFamily.value = api.families(session.token).firstOrNull()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            mutableFamily.value = null
+        mutableFamily.value = KidFamilyState.Loading
+        viewModelScope.launch {
+            mutableFamily.value =
+                try {
+                    val family = api.families(session.token).firstOrNull()
+                    if (family == null) KidFamilyState.Failed(FamilyError.SERVER) else KidFamilyState.Loaded(family)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    KidFamilyState.Failed(FamilyViewModel.errorOf(e))
+                }
         }
     }
 

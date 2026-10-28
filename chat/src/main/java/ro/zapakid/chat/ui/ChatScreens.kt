@@ -231,19 +231,13 @@ fun ChatScreen(
                 )
                 if (text.isBlank()) {
                     val label = stringResource(if (recording) R.string.chat_voice_stop else R.string.chat_voice)
+                    val scheme = MaterialTheme.colorScheme
+                    val fill = if (recording) scheme.error else scheme.primaryContainer
+                    val tint = if (recording) scheme.onError else scheme.onPrimaryContainer
                     IconButton(
                         { if (recording) actions.stopVoice(send = true) else actions.startVoice() },
-                        Modifier.size(
-                            52.dp
-                        ).background(
-                            if (recording) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            },
-                            CircleShape
-                        ).testTag(ChatTags.VOICE)
-                    ) { Icon(painterResource(R.drawable.ic_chat_mic), contentDescription = label) }
+                        Modifier.size(52.dp).background(fill, CircleShape).testTag(ChatTags.VOICE)
+                    ) { Icon(painterResource(R.drawable.ic_chat_mic), contentDescription = label, tint = tint) }
                 } else {
                     IconButton({
                         actions.send(text)

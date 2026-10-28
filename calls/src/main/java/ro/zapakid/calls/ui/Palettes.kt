@@ -1,8 +1,9 @@
 package ro.zapakid.calls.ui
 
 /**
- * The two ZapaKid looks, with the iOS app's tokens exactly (so both apps look the same), as plain ARGB values that
- * can be checked without Android:
+ * The two ZapaKid looks, with the iOS app's colour tokens (so both apps look the same), as plain ARGB values that
+ * can be checked without Android. Android-only: [Palette.accept], [Palette.error] (text-safe, the iOS button red is
+ * not) and the parents' 48 dp minimum tap size (44 pt on iOS).
  * - parents, "Calm & modern": mint and lavender on off-white, thin lines, 14 dp corners, no shadows;
  * - kids, "Playful & bright": warm yellow and sky blue, chunky 24 dp cards, soft shadows, sparkles.
  */
@@ -27,8 +28,13 @@ data class Palette(
     val theirText: Long,
     val callButton: Long,
     val callIcon: Long,
+    /** The hang-up button only: an icon-only red, not readable as text on light bubbles or in the dark looks. */
     val hangUp: Long,
     val hangUpIcon: Long,
+    /** Error text (failed message, missed call, sign-in error) on any surface, bubble or card: Material 3's. */
+    val error: Long,
+    /** Icons on an [error] fill (the recording button). */
+    val onError: Long,
     val speakingRing: Long,
     /** Kids' chat cards (parents don't use them). */
     val cardTints: List<Long>,
@@ -48,10 +54,19 @@ data class Palette(
         Triple("on secondary", onSecondary, secondary),
         Triple("my bubble", myText, myBubble),
         Triple("their bubble", theirText, theirBubble),
-        Triple("hang-up", hangUpIcon, hangUp)
+        Triple("hang-up", hangUpIcon, hangUp),
+        Triple("error on background", error, background),
+        Triple("error on surface", error, surface),
+        Triple("error on my bubble", error, myBubble),
+        Triple("error on their bubble", error, theirBubble),
+        Triple("on error", onError, error)
     ) +
         cardTints.flatMap {
-            listOf(Triple("text on card", text, it), Triple("secondary text on card", secondaryText, it))
+            listOf(
+                Triple("text on card", text, it),
+                Triple("secondary text on card", secondaryText, it),
+                Triple("error on card", error, it)
+            )
         }
 
     /** Icon-only buttons: WCAG non-text contrast 3:1 (their labels sit under them, on the background). */
@@ -100,6 +115,8 @@ object Palettes {
             callIcon = 0xFF14302A,
             hangUp = 0xFFC93A3A,
             hangUpIcon = 0xFFFFFFFF,
+            error = 0xFFB3261E,
+            onError = 0xFFFFFFFF,
             speakingRing = 0xFF3FB58F,
             cardTints = emptyList()
         )
@@ -125,6 +142,8 @@ object Palettes {
             callIcon = 0xFF0E1F19,
             hangUp = 0xFFB83232,
             hangUpIcon = 0xFFFFFFFF,
+            error = 0xFFFFB4AB,
+            onError = 0xFF601410,
             speakingRing = 0xFF7FD8B8,
             cardTints = emptyList()
         )
@@ -150,6 +169,8 @@ object Palettes {
             callIcon = 0xFFFFFFFF,
             hangUp = 0xFFC93A3A,
             hangUpIcon = 0xFFFFFFFF,
+            error = 0xFFB3261E,
+            onError = 0xFFFFFFFF,
             speakingRing = 0xFFF5B700,
             cardTints = listOf(0xFFFFF4CF, 0xFFE1F2FF, 0xFFE3F6E3, 0xFFFFFFFF)
         )
@@ -175,6 +196,8 @@ object Palettes {
             callIcon = 0xFFFFFFFF,
             hangUp = 0xFFB83232,
             hangUpIcon = 0xFFFFFFFF,
+            error = 0xFFFFB4AB,
+            onError = 0xFF601410,
             speakingRing = 0xFFFFD54A,
             cardTints = listOf(0xFF33304A, 0xFF23344D, 0xFF24402F, 0xFF24243A)
         )

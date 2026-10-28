@@ -24,7 +24,7 @@ val LocalUserRole = staticCompositionLocalOf { UserRole.Parent }
 /** Kids get chunky cards, sparkles and bigger targets; parents thin lines and whitespace. */
 val UserRole.playful: Boolean get() = this == UserRole.Kid
 
-/** This look's tokens (the iOS ones): bubbles, call buttons, speaking ring, kids' card tints. */
+/** This look's tokens (the iOS colours, plus a text-safe error): bubbles, call buttons, speaking ring, card tints. */
 val LocalPalette = staticCompositionLocalOf { Palettes.parentLight }
 
 /** This look's corner radius, spacing, minimum tap size, shadows and sparkles. */
@@ -55,8 +55,8 @@ fun colorSchemeOf(palette: Palette, dark: Boolean): ColorScheme {
         surfaceContainerHigh = c(palette.surface),
         outline = c(palette.separator),
         outlineVariant = c(palette.separator),
-        error = c(palette.hangUp),
-        onError = c(palette.hangUpIcon)
+        error = c(palette.error),
+        onError = c(palette.onError)
     )
 }
 
