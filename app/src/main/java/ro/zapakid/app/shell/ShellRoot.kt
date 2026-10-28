@@ -3,11 +3,16 @@
 package ro.zapakid.app.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import ro.zapakid.calls.CallController
@@ -44,24 +49,41 @@ private class Services(val chats: ChatRepository, val sync: ChatSync, val calls:
 @Composable
 fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
     val scope = rememberCoroutineScope()
-    val services by produceState<Services?>(null, deps) {
-        val sealers = deps.sealers.sealers() ?: return@produceState
-        val me = runCatching { deps.tokens.identity() }.getOrNull() ?: return@produceState
-        val chatApi = HttpChatApi(deps.chatUrl, deps.http, deps.tokens)
-        val deviceId = me.device.toIntOrNull() ?: return@produceState
-        val chats = ChatRepository(chatApi, deps.store(), sealers.chat, ChatDevice(me.account, deviceId))
-        val calls =
-            CallController(
-                HttpCallsApi(deps.callsUrl, deps.http, deps.tokens),
-                CallEventsClient(deps.callsUrl, deps.http, deps.tokens, CallDevice(me.account, me.device))::connect,
-                deps.engine(),
-                sealers.calls,
-                CallDevice(me.account, me.device),
-                deps.callLog,
-                scope,
-                CallPeople.Default
-            )
-        value = Services(chats, ChatSync(chats, chatApi, chatApi), calls)
+    val retry =
+        remember(deps) {
+            SetupRetry {
+                val sealers = deps.sealers.sealers() ?: return@SetupRetry null
+                val me = deps.tokens.identity()
+                val deviceId = me.device.toIntOrNull() ?: return@SetupRetry null
+                val chatApi = HttpChatApi(deps.chatUrl, deps.http, deps.tokens)
+                val chats = ChatRepository(chatApi, deps.store(), sealers.chat, ChatDevice(me.account, deviceId))
+                val calls =
+                    CallController(
+                        HttpCallsApi(deps.callsUrl, deps.http, deps.tokens),
+                        CallEventsClient(
+                            deps.callsUrl,
+                            deps.http,
+                            deps.tokens,
+                            CallDevice(me.account, me.device)
+                        )::connect,
+                        deps.engine(),
+                        sealers.calls,
+                        CallDevice(me.account, me.device),
+                        deps.callLog,
+                        scope,
+                        CallPeople.Default
+                    )
+                Services(chats, ChatSync(chats, chatApi, chatApi), calls)
+            }
+        }
+    val services by produceState<Services?>(null, retry) { value = retry.run() }
+    val setup by retry.state.collectAsState()
+    // Retry at once when the app comes to the front or the network comes back.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { retry.retryNow() }
+    val context = LocalContext.current
+    DisposableEffect(retry) {
+        val stop = watchNetwork(context) { retry.retryNow() }
+        onDispose { stop() }
     }
     val s = services
     LaunchedEffect(s) { s?.sync?.run() }
@@ -71,10 +93,10 @@ fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
         kid = kid,
         call = call,
         callActions = s?.calls?.let(::actionsOf) ?: NoCall,
-        chats = { if (s == null) SettingUpScreen() else ChatsRoute(s.chats, s.calls) },
+        chats = { if (s == null) SettingUpScreen(setup, retry::retryNow) else ChatsRoute(s.chats, s.calls) },
         calls = {
             if (s == null) {
-                SettingUpScreen()
+                SettingUpScreen(setup, retry::retryNow)
             } else {
                 CallLogScreen(log, avatarOf = { 0 }, onCallBack = { e ->
                     e.conversationId?.let { s.calls.startCall(it, e.title, if (e.group) 2 else 1) }

@@ -7,8 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +30,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -43,9 +48,9 @@ import ro.zapakid.chat.ui.ChatScreen
 import ro.zapakid.chat.ui.ConversationListScreen
 import ro.zapakid.chat.ui.VoiceRecorder
 
-/** Shown in Chats and Calls until this phone's chat keys are set up. */
+/** Shown in Chats and Calls until this phone's chat keys are set up; calm, with Try again after a failure. */
 @Composable
-fun SettingUpScreen() {
+fun SettingUpScreen(state: SetupState, onTryAgain: () -> Unit) {
     Surface(Modifier.fillMaxSize().testTag("setting_up")) {
         Column(
             Modifier.padding(32.dp),
@@ -58,6 +63,18 @@ fun SettingUpScreen() {
                 style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center
             )
+            if (state is SetupState.Waiting) {
+                Text(
+                    stringResource(R.string.setup_retry_body),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                )
+                OutlinedButton(onClick = onTryAgain, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.setup_try_again))
+                }
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package ro.zapakid.app.shell
 
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceTimeBy
@@ -9,7 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
 
 /** Key setup that failed (network, 5xx, attestation) is retried with backoff, and at once when asked. */
 @OptIn(ExperimentalCoroutinesApi::class)
