@@ -11,7 +11,7 @@ Keystore's AES-GCM, nothing hand-made).
 | HTTPS only, system CAs only, TLS 1.3 only on Android 10+ | Done | `network_security_config.xml`, `auth/Tls.kt` |
 | Exact versions, Gradle dependency verification, OSV-Scanner on PRs and daily, SBOM per release | Done | `gradle/`, `.github/workflows/` |
 | Chat database encrypted | Planned | below |
-| Chat keys: libsignal, Keystore-wrapped, Block Store backup | Planned | below |
+| Chat keys: libsignal stores, Keystore-protected; identity via Block Store | Done | `keys/` |
 | FLAG_SECURE on chat screens | Planned | below |
 | No chat content in logs, crash reports, notifications | Planned | below |
 | Play Integrity | Planned | below |
@@ -27,13 +27,22 @@ Keystore's AES-GCM, nothing hand-made).
 - Media (photos, voice) are encrypted per file by the sender with libsignal attachment keys; on the phone they stay
   in app-private storage, decrypted only into memory for display/playback.
 
-## Key backup (Android Block Store)
+## Key backup (Android Block Store): one identity per account
 
-- `allowBackup=false` stays. The only backup is deliberate: the libsignal identity key pair and the database
-  passphrase go to Block Store with `setShouldBackupToCloud(true)`, which Google stores end-to-end encrypted with the
-  phone's screen lock. Only when `isEndToEndEncryptionAvailable()` is true; otherwise no cloud backup, and the new
-  phone recovers keys from another family phone (QR transfer) or starts fresh.
-- Signing in with Google/Apple alone never restores keys: the API holds none.
+Decided 2026-10-26, same as iOS (iCloud Keychain). Implemented in `keys/LocalIdentity.kt` and
+`keys/BlockStoreIdentityBackup.kt`.
+
+- `allowBackup=false` stays. The **libsignal identity key pair is the only item that leaves the phone**: it goes to
+  Block Store, and to Google's cloud backup only when `isEndToEndEncryptionAvailable()` is true (end-to-end
+  encrypted with the phone's screen lock). Otherwise it stays in Block Store on this phone (survives a reinstall).
+- The registration ID, prekeys, Kyber prekeys, sessions and (later) the chat database stay on the phone, encrypted
+  with Keystore keys in `noBackupFilesDir`.
+- The parent's other phones and a reinstall get the identity from Block Store. When the account has an identity
+  but this phone can't get it, the app waits for a **re-share** from another family phone (stub for now) and never
+  makes a new identity, which every peer would see as a key change.
+- Signing in with Google/Apple alone never restores keys: the API holds none, and Google's restore needs the old
+  phone's screen lock.
+- Chat history on a new phone (a later PR) comes from another family phone, not from Block Store.
 
 ## No content leaks
 
