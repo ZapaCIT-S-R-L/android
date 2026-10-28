@@ -45,7 +45,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import ro.zapakid.calls.ui.RobotAvatar
+import ro.zapakid.chat.ChatContent
 import ro.zapakid.chat.Conversation
 import ro.zapakid.chat.Message
 import ro.zapakid.chat.MessageKind
@@ -270,11 +272,21 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
                 }
 
                 MessageKind.Voice -> {
-                    val seconds = (message.attachment?.durationMillis ?: 0) / MILLIS
+                    val seconds = (message.attachment?.duration ?: 0.0).roundToInt()
                     TextButton({ actions.play(message) }, Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.chat_voice_note, seconds))
                     }
                 }
+
+                MessageKind.Call -> Text(
+                    stringResource(R.string.chat_call_message),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                MessageKind.Unsupported -> Text(
+                    stringResource(R.string.chat_unsupported),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
             when (message.status) {
                 MessageStatus.Sending -> Text(
@@ -293,5 +305,4 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
     }
 }
 
-private const val MAX_TEXT = 4000
-private const val MILLIS = 1000
+private const val MAX_TEXT = ChatContent.MAX_TEXT

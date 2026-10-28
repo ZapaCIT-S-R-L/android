@@ -18,4 +18,6 @@
     <string name="chat_voice_note">Sprachnachricht, %1$d s. Abspielen</string>
     <string name="chat_sending">Wird gesendet…</string>
     <string name="chat_failed">Nicht gesendet. Tippe, um es nochmal zu versuchen</string>
+    <string name="chat_call_message">Anruf</string>
+    <string name="chat_unsupported">Diese Nachricht braucht ein neueres ZapaKid. Bitte aktualisiere die App.</string>
 </resources>

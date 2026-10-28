@@ -98,7 +98,8 @@ class ChatRepositoryTest {
     private val anaStore = InMemoryChatStore()
     private val anaPhone = ChatRepository(server, anaStore, Sealer(ana), ana, clock = { 1000 })
 
-    private fun phone(device: ChatDevice) = ChatRepository(server, InMemoryChatStore(), Sealer(device), device)
+    private fun phone(device: ChatDevice, onCall: (String, String, String) -> Unit = { _, _, _ -> }) =
+        ChatRepository(server, InMemoryChatStore(), Sealer(device), device, clock = { 1000 }, onIncomingCall = onCall)
 
     private fun relayedTo(device: ChatDevice, n: Int = 0): WireEnvelope {
         val (conversation, id, envelopes) = server.sent.last()
@@ -200,9 +201,41 @@ class ChatRepositoryTest {
     }
 
     @Test
-    fun emptyTextIsNotSent() = runTest {
+    fun emptyOrOverlongTextIsNotSent() = runTest {
         anaPhone.sendText("c1", "   ")
+        anaPhone.sendText("c1", "a".repeat(4001))
 
         assertTrue(server.sent.isEmpty())
+    }
+
+    @Test
+    fun aCallAnnouncementRingsTheOtherPhoneAndShowsAsACall() = runTest {
+        anaPhone.sendCall("c1", "call-1")
+        val rang = mutableListOf<Triple<String, String, String>>()
+        val ionPhone = phone(ion) { callId, conversation, from -> rang += Triple(callId, conversation, from) }
+
+        assertTrue(ionPhone.receive(relayedTo(ion)))
+
+        val message = ionPhone.messages("c1").first().single()
+        assertEquals(MessageKind.Call, message.kind)
+        assertEquals("call-1", message.callId)
+        assertEquals(listOf(Triple("call-1", "c1", "ana")), rang)
+        assertEquals("📞", ionPhone.conversations().first().single().lastMessage)
+    }
+
+    @Test
+    fun contentInANewerFormatIsKeptAsAPlaceholderAndAcknowledged() = runTest {
+        val newer = """{"v":2,"id":"m-new","sentAt":1000,"body":{"sticker":{"_0":"x"}}}"""
+        val sealed = Sealer(ana).seal(newer.encodeToByteArray(), ion)
+        val content = Base64.getEncoder().encodeToString(sealed.content)
+        server.queued = listOf(WireEnvelope("e-new", "c1", "m-new", "ana", 1, "message", content, 5))
+        val ionPhone = phone(ion)
+
+        ionPhone.sync("c1")
+
+        val message = ionPhone.messages("c1").first().single()
+        assertEquals(MessageKind.Unsupported, message.kind)
+        assertEquals("m-new", message.id)
+        assertEquals(listOf("e-new"), server.acked)
     }
 }

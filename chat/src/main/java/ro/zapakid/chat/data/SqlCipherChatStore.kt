@@ -40,7 +40,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
         db.execSQL(
             """CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, sender TEXT NOT NULL,
                mine INTEGER NOT NULL, kind TEXT NOT NULL, text TEXT, attachment TEXT, sent_at INTEGER NOT NULL,
-               status TEXT NOT NULL, local_file TEXT)"""
+               status TEXT NOT NULL, local_file TEXT, call_id TEXT)"""
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS messages_by_conversation ON messages (conversation_id, sent_at)")
     }
@@ -93,6 +93,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
                 put("sent_at", message.sentAt)
                 put("status", message.status.name)
                 put("local_file", message.localFile)
+                put("call_id", message.callId)
             }
         val added = db.insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
         if (added) {
@@ -158,6 +159,7 @@ class SqlCipherChatStore(context: Context, passphrase: ByteArray, name: String =
         attachment = c.str("attachment")?.let { json.decodeFromString(AttachmentRef.serializer(), it) },
         sentAt = c.long("sent_at"),
         status = MessageStatus.valueOf(c.str("status")!!),
-        localFile = c.str("local_file")
+        localFile = c.str("local_file"),
+        callId = c.str("call_id")
     )
 }
