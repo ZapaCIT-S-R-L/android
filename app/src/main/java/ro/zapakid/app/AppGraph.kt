@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.browser.customtabs.CustomTabsIntent
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import ro.zapakid.app.auth.AgeSignalsSource
@@ -115,6 +118,17 @@ class AppGraph(
     private fun account(): String =
         checkNotNull(authRepository.current()?.id ?: kidSessionStore.load()?.kid?.id) { "signed out" }
 
+    /** Outlives the composition, so a sign-out can finish its teardown while the shell is being disposed. */
+    private val shutdownScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** The signed-in session's shutdown: the call, then the chat sync, then the account's database. */
+    val shutdown: ro.zapakid.app.shell.SessionShutdown by lazy {
+        ro.zapakid.app.shell.SessionShutdown(shutdownScope) { chatStores.close() }
+    }
+
+    /** The phone signed out: release the call, the sync and the account's chat store, in that order. */
+    fun signedOut() = shutdown.signedOut()
+
     val shell: ro.zapakid.app.shell.ShellDeps by lazy {
         ro.zapakid.app.shell.ShellDeps(
             http = http,
@@ -130,7 +144,8 @@ class AppGraph(
                     ro.zapakid.calls.api.HttpCallsApi(BuildConfig.CALLS_BASE_URL.toHttpUrl(), http, chatTokens)
                 )
             },
-            callLog = callLog
+            callLog = callLog,
+            shutdown = shutdown
         )
     }
 }

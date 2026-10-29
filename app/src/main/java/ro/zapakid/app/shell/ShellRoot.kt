@@ -3,11 +3,16 @@
 package ro.zapakid.app.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import ro.zapakid.calls.CallController
@@ -35,7 +40,9 @@ class ShellDeps(
     val sealers: SealerSource,
     val store: () -> ChatStore,
     val engine: () -> CallEngine,
-    val callLog: CallLog
+    val callLog: CallLog,
+    /** Outlives this composition: a sign-out shuts the session down there, not on the shell's own scope. */
+    val shutdown: SessionShutdown
 )
 
 private class Services(val chats: ChatRepository, val sync: ChatSync, val calls: CallController)
@@ -64,7 +71,19 @@ fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
         value = Services(chats, ChatSync(chats, chatApi, chatApi), calls)
     }
     val s = services
-    LaunchedEffect(s) { s?.sync?.run() }
+    // The jobs that use the chat store, so a sign-out can cancel and await them before the store closes.
+    val workers = remember { mutableStateListOf<Job>() }
+    LaunchedEffect(s) {
+        workers.clear()
+        s?.let { workers += scope.launch { it.sync.run() } }
+    }
+    // Registering the session rather than shutting it down here: leaving the composition is also a rotation, and a
+    // rotation must not hang up. Sign-out goes through the app graph, whose scope outlives this one.
+    DisposableEffect(s) {
+        val session = s?.let { SessionShutdown.Session(it.calls::signOut) { workers.toList() } }
+        session?.let(deps.shutdown::attach)
+        onDispose { session?.let(deps.shutdown::detach) }
+    }
     val call = s?.calls?.state?.collectAsState()?.value ?: ro.zapakid.calls.CallUiState()
     val log by deps.callLog.entries.collectAsState()
     AppShell(

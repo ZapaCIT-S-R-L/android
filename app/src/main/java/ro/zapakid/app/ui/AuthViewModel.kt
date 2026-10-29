@@ -33,7 +33,11 @@ sealed interface AuthUiState {
     data object AttestationFailed : AuthUiState
 }
 
-class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
+class AuthViewModel(
+    private val repository: AuthRepository,
+    /** Runs once the session is gone, so the app graph can shut the signed-in shell down: call, sync, chat store. */
+    private val onSignedOut: () -> Unit = {}
+) : ViewModel() {
     private val _state =
         MutableStateFlow<AuthUiState>(
             repository.current()?.let { AuthUiState.SignedIn(it) } ?: AuthUiState.SignedOut()
@@ -91,6 +95,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     fun logout() {
         viewModelScope.launch {
             repository.logout()
+            onSignedOut()
             _state.value = AuthUiState.SignedOut()
         }
     }

@@ -42,12 +42,16 @@ class ChatTokenClient(
 
     class Identity(val account: String, val device: String)
 
-    override suspend fun token(): String = lock.withLock {
-        val bearer = bearer()
-        (cachedFor(bearer) ?: fetch(bearer)).token
+    // Both entry points read the session, which costs an encrypted-file read and a Keystore decrypt, so neither
+    // runs on the caller's thread — a cache hit must not put that work on the UI thread either.
+    override suspend fun token(): String = withContext(Dispatchers.IO) {
+        lock.withLock {
+            val bearer = bearer()
+            (cachedFor(bearer) ?: fetch(bearer)).token
+        }
     }
 
-    override suspend fun refresh(): String = lock.withLock { fetch(bearer()) }.token
+    override suspend fun refresh(): String = withContext(Dispatchers.IO) { lock.withLock { fetch(bearer()) } }.token
 
     /** Who this phone is, from the token's claims (`sub`, `dev`). */
     suspend fun identity(): Identity {
@@ -63,7 +67,8 @@ class ChatTokenClient(
         cachedSession == bearer && now().plusSeconds(MARGIN_SECONDS).isBefore(Instant.parse(it.expiresAt))
     }
 
-    private suspend fun fetch(bearer: String): Token = withContext(Dispatchers.IO) {
+    /** Already on [Dispatchers.IO]: both callers wrap the lock in it. */
+    private suspend fun fetch(bearer: String): Token {
         val request =
             Request
                 .Builder()
@@ -71,7 +76,7 @@ class ChatTokenClient(
                 .header("Authorization", "Bearer $bearer")
                 .post(ByteArray(0).toRequestBody(null))
                 .build()
-        client.newCall(request).execute().use { response ->
+        return client.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "chat token: HTTP ${response.code}" }
             json.decodeFromString(Token.serializer(), response.body.string()).also {
                 cached = it

@@ -102,6 +102,8 @@ class FakeCallEngine : CallEngine {
     override val events: Flow<EngineEvent> = flow
     var started = false
     var stopped = false
+    var released = false
+        private set
     var isMuted = false
         private set
     var speakerOn = false
@@ -133,6 +135,10 @@ class FakeCallEngine : CallEngine {
 
     override suspend fun stop() {
         stopped = true
+    }
+
+    override fun release() {
+        released = true
     }
 
     fun emit(event: EngineEvent) {
