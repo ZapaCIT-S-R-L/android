@@ -16,15 +16,14 @@ class PerAccountChatStoreTest {
     private val byName = mutableMapOf<String, ChatStore>()
     private var switches = 0
 
-    private fun newStores() =
-        PerAccountChatStore(
-            openStore = { name ->
-                opened += name
-                byName.getOrPut(name) { InMemoryChatStore() }
-            },
-            closeStore = { closed += it },
-            onSwitch = { switches++ }
-        )
+    private fun newStores() = PerAccountChatStore(
+        openStore = { name ->
+            opened += name
+            byName.getOrPut(name) { InMemoryChatStore() }
+        },
+        closeStore = { closed += it },
+        onSwitch = { switches++ }
+    )
 
     @Test
     fun aSecondAccountClosesTheFirstAndOpensItsOwnDatabase() {

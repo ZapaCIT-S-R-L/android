@@ -59,10 +59,9 @@ class ChatTokenClient(
     private fun bearer(): String = checkNotNull(session()) { "signed out" }
 
     /** The cache of this session only, and only while it is more than [MARGIN_SECONDS] from expiry. */
-    private fun cachedFor(bearer: String): Token? =
-        cached?.takeIf {
-            cachedSession == bearer && now().plusSeconds(MARGIN_SECONDS).isBefore(Instant.parse(it.expiresAt))
-        }
+    private fun cachedFor(bearer: String): Token? = cached?.takeIf {
+        cachedSession == bearer && now().plusSeconds(MARGIN_SECONDS).isBefore(Instant.parse(it.expiresAt))
+    }
 
     private suspend fun fetch(bearer: String): Token = withContext(Dispatchers.IO) {
         val request =

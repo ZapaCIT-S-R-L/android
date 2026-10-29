@@ -49,15 +49,15 @@ class PerAccountChatStore(
     companion object {
         private val FILE_SAFE = Regex("[A-Za-z0-9_-]{1,64}")
         private const val BYTE_MASK = 0xff
+        private const val HEX_RADIX = 16
         private const val HEX_WIDTH = 2
 
         /** A file name for one account: its id when that is already file-safe, a digest of it otherwise. */
         fun nameOf(id: String): String = id.takeIf { FILE_SAFE.matches(it) } ?: digest(id)
 
-        private fun digest(id: String): String =
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest(id.toByteArray())
-                .joinToString("") { (it.toInt() and BYTE_MASK).toString(16).padStart(HEX_WIDTH, '0') }
+        private fun digest(id: String): String {
+            val sha = MessageDigest.getInstance("SHA-256").digest(id.toByteArray())
+            return sha.joinToString("") { (it.toInt() and BYTE_MASK).toString(HEX_RADIX).padStart(HEX_WIDTH, '0') }
+        }
     }
 }
