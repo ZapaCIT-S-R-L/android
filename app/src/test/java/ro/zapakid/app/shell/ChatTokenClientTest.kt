@@ -2,19 +2,22 @@ package ro.zapakid.app.shell
 
 import java.time.Instant
 import java.util.Base64
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 
-/** Chat tokens from the account service, cached until a minute before expiry. */
+/** Chat tokens from the account service, cached until a minute before expiry — for that session only. */
 class ChatTokenClientTest {
     private val server = MockWebServer()
     private var now = Instant.parse("2026-10-27T10:00:00Z")
+    private var bearer: String? = "zks_session"
     private lateinit var tokens: ChatTokenClient
 
     private fun jwt(n: Int): String {
@@ -29,7 +32,7 @@ class ChatTokenClientTest {
     @Before
     fun setUp() {
         server.start()
-        tokens = ChatTokenClient(server.url("/v1/"), OkHttpClient(), session = { "zks_session" }, now = { now })
+        tokens = ChatTokenClient(server.url("/v1/"), OkHttpClient(), session = { bearer }, now = { now })
     }
 
     @After
@@ -68,5 +71,46 @@ class ChatTokenClientTest {
 
         assertEquals("acc-1", me.account)
         assertEquals("dev-7", me.device)
+    }
+
+    @Test
+    fun anotherAccountNeverReceivesTheCachedTokenOfThePreviousOne() = runTest {
+        enqueue(1, "2026-10-27T10:10:00Z")
+        enqueue(2, "2026-10-27T10:10:00Z")
+        assertEquals(jwt(1), tokens.token())
+
+        bearer = "zks_session_b"
+
+        assertEquals("B fetches its own token within A's token lifetime", jwt(2), tokens.token())
+        assertEquals(2, server.requestCount)
+        server.takeRequest()
+        assertEquals("Bearer zks_session_b", server.takeRequest().headers["Authorization"])
+    }
+
+    @Test
+    fun aSignedOutPhoneGetsNoTokenAtAll() = runTest {
+        enqueue(1, "2026-10-27T10:10:00Z")
+        assertEquals(jwt(1), tokens.token())
+
+        bearer = null
+
+        val error = assertThrows(IllegalStateException::class.java) { runBlocking { tokens.token() } }
+        assertEquals("signed out", error.message)
+        assertEquals("the cached token went with the session", 1, server.requestCount)
+    }
+
+    @Test
+    fun returningToAnAccountFetchesAgainRatherThanHoldingTwoTokens() = runTest {
+        enqueue(1, "2026-10-27T10:10:00Z")
+        enqueue(2, "2026-10-27T10:10:00Z")
+        enqueue(3, "2026-10-27T10:10:00Z")
+        assertEquals(jwt(1), tokens.token())
+        bearer = "zks_session_b"
+        assertEquals(jwt(2), tokens.token())
+
+        bearer = "zks_session"
+
+        assertEquals("only one account's token is ever held", jwt(3), tokens.token())
+        assertEquals(3, server.requestCount)
     }
 }

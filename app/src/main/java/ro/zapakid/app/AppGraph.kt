@@ -87,7 +87,33 @@ class AppGraph(
         })
     }
 
-    val callLog: ro.zapakid.calls.CallLog by lazy { ro.zapakid.calls.InMemoryCallLog() }
+    val callLog: ro.zapakid.calls.InMemoryCallLog by lazy { ro.zapakid.calls.InMemoryCallLog() }
+
+    /**
+     * The chat store of the signed-in account: its own database file and its own key, closed when the phone changes
+     * account, so one account never opens another's stored conversations.
+     */
+    private val chatStores: ro.zapakid.app.shell.PerAccountChatStore by lazy {
+        ro.zapakid.app.shell.PerAccountChatStore(
+            openStore = { name ->
+                ro.zapakid.chat.data.SqlCipherChatStore(
+                    app,
+                    ro.zapakid.chat.data.DatabaseKey.load(
+                        File(app.noBackupFilesDir, "$name.key"),
+                        KeystoreKeyWrapper()
+                    ),
+                    "$name.db"
+                )
+            },
+            closeStore = { store -> (store as? ro.zapakid.chat.data.SqlCipherChatStore)?.close() },
+            // The call log is process state rather than store state: a new account must not see the old one's calls.
+            onSwitch = { callLog.clear() }
+        )
+    }
+
+    /** The account this phone is signed in as: the parent's, or the paired kid's on a kid phone. */
+    private fun account(): String =
+        checkNotNull(authRepository.current()?.id ?: kidSessionStore.load()?.kid?.id) { "signed out" }
 
     val shell: ro.zapakid.app.shell.ShellDeps by lazy {
         ro.zapakid.app.shell.ShellDeps(
@@ -97,15 +123,7 @@ class AppGraph(
             tokens = chatTokens,
             // The libsignal sealers are wired here once the key-setup PRs land (android #12, #17).
             sealers = ro.zapakid.app.shell.SealerSource.None,
-            store = {
-                ro.zapakid.chat.data.SqlCipherChatStore(
-                    app,
-                    ro.zapakid.chat.data.DatabaseKey.load(
-                        File(app.noBackupFilesDir, "chat-db.key"),
-                        KeystoreKeyWrapper()
-                    )
-                )
-            },
+            store = { chatStores.forAccount(account()) },
             engine = {
                 ro.zapakid.calls.engine.WebRtcCallEngine(
                     app,
