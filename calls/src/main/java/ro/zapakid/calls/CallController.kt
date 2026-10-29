@@ -21,6 +21,8 @@ import ro.zapakid.calls.crypto.CallKeySealer
 import ro.zapakid.calls.crypto.KeyRing
 import ro.zapakid.calls.engine.CallEngine
 import ro.zapakid.calls.engine.EngineEvent
+import ro.zapakid.calls.ring.Ringback
+import ro.zapakid.calls.ring.ToneRingback
 
 /** Opens the per-call event socket; [ro.zapakid.calls.api.CallEventsClient] in the app, a fake in tests. */
 fun interface CallEventsSource {
@@ -66,8 +68,8 @@ data class CallUiState(
 data class CallTiming(val ringMillis: Long = 45_000, val reconnectMillis: Long = 20_000)
 
 /**
- * Runs one call at a time: the calls API, the event socket, key rotation and the media engine, folded into one
- * [CallUiState]. Call its methods from the main thread (or the [scope]'s single thread).
+ * Runs one call at a time: the calls API, the event socket, key rotation, the media engine and the caller's ringback,
+ * folded into one [CallUiState]. Call its methods from the main thread (or the [scope]'s single thread).
  */
 @Suppress("TooManyFunctions", "LongParameterList") // constructor injection: every collaborator is swappable in tests
 class CallController(
@@ -80,7 +82,8 @@ class CallController(
     private val scope: CoroutineScope,
     private val people: CallPeople = CallPeople.Default,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val timing: CallTiming = CallTiming()
+    private val timing: CallTiming = CallTiming(),
+    private val ringback: Ringback = ToneRingback()
 ) {
     private val mutableState = MutableStateFlow(CallUiState())
     val state: StateFlow<CallUiState> = mutableState
@@ -341,6 +344,12 @@ class CallController(
         val after = CallStateMachine.reduce(before, event)
         if (after == before) return
         mutableState.update { it.copy(phase = after) }
+        // The caller hears the ring-ring only while the call rings out, so leaving that phase stops it: answered,
+        // declined, hung up, timed out, lost or failed, including an end that reaches us through Telecom.
+        when {
+            after == CallState.Calling -> ringback.start()
+            before == CallState.Calling -> ringback.stop()
+        }
         if (after is CallState.Ended) finish(after.reason)
         if (after == CallState.Idle) mutableState.value = CallUiState()
     }
