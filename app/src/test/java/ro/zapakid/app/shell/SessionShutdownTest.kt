@@ -2,6 +2,7 @@ package ro.zapakid.app.shell
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The shutdown on its own: the order it releases in, a duplicate logout, and a session that never published. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionShutdownTest {
     private val events = mutableListOf<String>()
     private val closed = mutableListOf<String>()

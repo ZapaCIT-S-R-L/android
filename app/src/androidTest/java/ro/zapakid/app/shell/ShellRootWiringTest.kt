@@ -1,6 +1,10 @@
 package ro.zapakid.app.shell
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -51,13 +55,15 @@ class ShellRootWiringTest {
     @Test
     fun replacingTheCompositionReusesTheRetainedSessionInsteadOfBuildingAnother() {
         val deps = deps()
+        var generation by mutableStateOf(0)
 
-        compose.setContent { MaterialTheme { ShellRoot(deps, kid = false) {} } }
+        compose.setContent { MaterialTheme { key(generation) { ShellRoot(deps, kid = false) {} } } }
+        compose.waitForIdle()
         compose.onNodeWithTag("setting_up").assertIsDisplayed()
         assertEquals("the first composition builds the session", 1, builds)
 
-        // A configuration change: this composition goes away and a new one takes over the same session.
-        compose.setContent { MaterialTheme { ShellRoot(deps, kid = false) {} } }
+        // A configuration change: this subtree is disposed and a new one takes over the same session.
+        generation = 1
         compose.waitForIdle()
 
         assertEquals("and the replacement reconnects to it", 1, builds)

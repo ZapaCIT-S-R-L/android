@@ -2,6 +2,7 @@ package ro.zapakid.app.shell
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ import ro.zapakid.chat.data.InMemoryChatStore
  * paths a sign-out has to get right: a configuration change must not orphan the call, and a teardown that finishes
  * late must not touch the account that signed in after it.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionLifecycleTest {
     private val events = mutableListOf<String>()
     private val opened = mutableListOf<String>()
@@ -130,6 +132,10 @@ class SessionLifecycleTest {
         assertEquals(listOf("acc-a", "acc-b"), opened)
         assertNotNull(sessions.session.services.value)
         assertEquals("A's call log did not reach B", emptyList<CallLogEntry>(), log.entries.value)
+
+        // B's sync is still running; the test scope must not be left with unfinished work.
+        sessions.signedOut()
+        advanceUntilIdle()
     }
 
     @Test
