@@ -220,7 +220,7 @@ class CallController(
 
     private suspend fun onSignal(signal: CallSignal) {
         when (signal) {
-            is CallSignal.Roster -> onRoster(signal.participants, signal.epoch)
+            is CallSignal.Roster -> onRoster(signal.participants, signal.epoch, signal.keyLeader)
 
             is CallSignal.Key ->
                 if (keys?.onEnvelope(signal.envelope) == true) {
@@ -251,7 +251,7 @@ class CallController(
         else -> CallEvent.RemoteEnded
     }
 
-    private suspend fun onRoster(participants: List<Participant>, epoch: Int) {
+    private suspend fun onRoster(participants: List<Participant>, epoch: Int, keyLeader: CallDevice?) {
         val devices = participants.map { it.device }
         val others = participants.filter { it.device != self }
         mutableState.update { state ->
@@ -264,7 +264,7 @@ class CallController(
         if (self !in devices) return
         val manager = keys ?: return
         val before = manager.currentEpoch
-        val envelopes = manager.onRoster(devices, serverEpoch = epoch)
+        val envelopes = manager.onRoster(devices, serverEpoch = epoch, keyLeader = keyLeader)
         envelopes.firstOrNull()?.let { connection?.sendKeys(it.epoch, envelopes) }
         if (manager.currentEpoch != before) {
             engine.onKeyRotated(manager.currentEpoch)

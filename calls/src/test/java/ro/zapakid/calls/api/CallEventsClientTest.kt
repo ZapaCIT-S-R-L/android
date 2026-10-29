@@ -99,6 +99,7 @@ class CallEventsClientTest {
         val roster = list[0] as CallSignal.Roster
         assertEquals(listOf(self, CallDevice("acc-b", "2")), roster.participants.map { it.device })
         assertEquals(3, roster.epoch)
+        assertEquals("the server's keyLeader reaches the key manager", self, roster.keyLeader)
         assertEquals(listOf("audio-a"), roster.participants[0].tracks)
         assertEquals("sess-a", roster.participants[0].sessionId)
         val key = (list[1] as CallSignal.Key).envelope

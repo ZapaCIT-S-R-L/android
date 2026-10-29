@@ -23,7 +23,12 @@ data class Participant(val device: CallDevice, val tracks: List<String>, val ses
 /** What the per-call event socket (`GET /v1/calls/{callId}/events`) tells this phone. */
 sealed interface CallSignal {
     /** The call after every change: participants, the key epoch and its leader. */
-    data class Roster(val participants: List<Participant>, val epoch: Int, val state: String = "active") : CallSignal
+    data class Roster(
+        val participants: List<Participant>,
+        val epoch: Int,
+        val state: String = "active",
+        val keyLeader: CallDevice? = null
+    ) : CallSignal
 
     /** A sealed call key for this device. */
     data class Key(val envelope: KeyEnvelope) : CallSignal
@@ -156,7 +161,8 @@ internal class SignalCodec(private val self: CallDevice) {
                         Participant(CallDevice(it.accountId, it.deviceId.toString()), it.tracks, it.sessionId)
                     },
                     call.epoch,
-                    call.state
+                    call.state,
+                    call.keyLeader?.let { CallDevice(it.accountId, it.deviceId.toString()) }
                 )
             }
 

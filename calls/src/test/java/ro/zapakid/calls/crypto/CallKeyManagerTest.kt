@@ -9,14 +9,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Key rotation: the first device in the roster (join order) is the key leader. It makes a new random key on every
- * join and leave and seals it to each other device; a device that left never receives the next key, and one that
- * joins never receives an earlier one.
+ * Key rotation: the server's keyLeader (or, when a roster names none, the lowest device id) leads. It makes a new
+ * random key on every join and leave and seals it to each other device; a device that left never receives the next
+ * key, and one that joins never receives an earlier one.
  */
 class CallKeyManagerTest {
     private val a = CallDevice("acc-a", "dev-a")
     private val b = CallDevice("acc-b", "dev-b")
     private val c = CallDevice("acc-c", "dev-c")
+
+    // iOS follows the server's keyLeader (the longest-present device). Both phones must agree on it whichever
+    // device id sorts first, or each makes its own key and rejects the other's: a call with no audio.
+    private val ios = CallDevice("acc-z", "1")
+    private val android = CallDevice("acc-a", "1")
 
     private class Phone(val device: CallDevice, callId: String = "call-1") {
         val ring = KeyRing()
@@ -180,11 +185,72 @@ class CallKeyManagerTest {
     }
 
     @Test
-    fun theLowestDeviceIdLeadsWhateverTheJoinOrder() = runTest {
+    fun withoutAServerLeaderTheLowestDeviceIdLeadsWhateverTheJoinOrder() = runTest {
         val phoneB = Phone(b)
 
         assertTrue("acc-b.dev-b sorts before acc-c.dev-c", phoneB.keys.onRoster(listOf(c, b)).isNotEmpty())
         assertEquals(emptyList<KeyEnvelope>(), Phone(c).keys.onRoster(listOf(c, b)))
+    }
+
+    @Test
+    fun theServersLeaderLeadsEvenWhenItSortsLast() = runTest {
+        val phone = Phone(android)
+        val leader = Phone(ios)
+        assertTrue("the iOS leader sorts after the Android device", ios.id > android.id)
+
+        // The iOS caller joined first; the Android callee joins second.
+        assertEquals(emptyList<KeyEnvelope>(), phone.keys.onRoster(listOf(ios, android), 1, keyLeader = ios))
+        assertNull("Android doesn't rotate when iOS leads", phone.ring.current)
+        val envelopes = leader.keys.onRoster(listOf(ios, android), 1, keyLeader = ios)
+
+        assertEquals(listOf(android), envelopes.map { it.toDevice })
+        assertTrue(phone.keys.onEnvelope(envelopes.single()))
+        assertEquals(1, phone.ring.current?.epoch)
+        assertArrayEquals(leader.ring.current!!.bytes(), phone.ring.current!!.bytes())
+        assertTrue(phone.keys.hasCurrentKey)
+    }
+
+    @Test
+    fun theServersLeaderRotatesWhenItIsThisDevice() = runTest {
+        val phone = Phone(android)
+        val callee = Phone(ios)
+
+        // The Android caller joined first; the iOS callee joins second.
+        val envelopes = phone.keys.onRoster(listOf(android, ios), 1, keyLeader = android)
+
+        assertEquals(listOf(ios), envelopes.map { it.toDevice })
+        assertTrue(envelopes.all { it.epoch == 1 && it.fromDevice == android })
+        assertEquals(1, phone.ring.current?.epoch)
+        assertEquals(emptyList<KeyEnvelope>(), callee.keys.onRoster(listOf(android, ios), 1, keyLeader = android))
+        assertTrue(callee.keys.onEnvelope(envelopes.single()))
+        assertArrayEquals(phone.ring.current!!.bytes(), callee.ring.current!!.bytes())
+    }
+
+    @Test
+    fun aDeviceThatSortsFirstButIsNotTheServersLeaderNeitherRotatesNorIsTrusted() = runTest {
+        val phone = Phone(android)
+        phone.keys.onRoster(listOf(ios, android), 1, keyLeader = ios)
+        // A key from anyone but the server's leader is refused, even from a device that sorts before it.
+        val forgedKey = CallKey.random(2, java.security.SecureRandom())
+        val blob = FakeCallKeySealer(c).seal(SealedKeyPayload.encode("call-1", forgedKey), android)
+
+        assertFalse(phone.keys.onEnvelope(KeyEnvelope(2, c, android, blob)))
+        assertNull(phone.ring.current)
+    }
+
+    @Test
+    fun aLeaderChangeFromTheServerHandsRotationOver() = runTest {
+        val phone = Phone(android)
+        val first = Phone(ios)
+        val envelopes = first.keys.onRoster(listOf(ios, android), 1, keyLeader = ios)
+        phone.keys.onRoster(listOf(ios, android), 1, keyLeader = ios)
+        assertTrue(phone.keys.onEnvelope(envelopes.single()))
+
+        // iOS leaves; a third device joins later and sorts first, but the server names Android, now longest present.
+        val rekey = phone.keys.onRoster(listOf(android, c), 3, keyLeader = android)
+
+        assertEquals(listOf(c), rekey.map { it.toDevice })
+        assertEquals(3, phone.ring.current?.epoch)
     }
 
     @Test
