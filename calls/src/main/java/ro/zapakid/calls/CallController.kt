@@ -396,13 +396,11 @@ class CallController(
         media: Boolean,
         wasJoined: Boolean,
         on: CoroutineScope
-    ): Job {
-        return on.launch {
-            withContext(NonCancellable) {
-                socket?.close()
-                if (media) runCatchingApi { engine.stop() }
-                if (wasJoined && callId != null) runCatchingApi { api.leave(callId) }
-            }
+    ): Job = on.launch {
+        withContext(NonCancellable) {
+            socket?.close()
+            if (media) runCatchingApi { engine.stop() }
+            if (wasJoined && callId != null) runCatchingApi { api.leave(callId) }
         }
     }
 
