@@ -1,12 +1,17 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.signal.libsignal.protocol.IdentityKeyPair
 import org.signal.libsignal.protocol.SignalProtocolAddress
+import org.signal.libsignal.protocol.UntrustedIdentityException
 import org.signal.libsignal.protocol.ecc.ECKeyPair
 import org.signal.libsignal.protocol.kem.KEMKeyPair
 import org.signal.libsignal.protocol.kem.KEMKeyType
@@ -15,6 +20,12 @@ import org.signal.libsignal.protocol.state.PreKeyBundle
 import org.signal.libsignal.protocol.state.PreKeyRecord
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import org.signal.libsignal.protocol.state.impl.InMemorySignalProtocolStore
+import ro.zapakid.app.auth.Session
+import ro.zapakid.app.testing.ANA
+import ro.zapakid.app.testing.FAR_FUTURE
+import ro.zapakid.app.testing.FakeBlockStore
+import ro.zapakid.app.testing.NoReshare
+import ro.zapakid.app.testing.TestBlobCipher
 import ro.zapakid.calls.crypto.CallDevice
 import ro.zapakid.calls.crypto.CallKeySealerException
 import ro.zapakid.chat.ChatDevice
@@ -117,5 +128,79 @@ class LibsignalSealersTest {
                 LibsignalMessageSealer(sessions(ana)).seal(byteArrayOf(1), ChatDevice("nobody", 1))
             }
         }
+    }
+
+    @get:Rule
+    val folder = TemporaryFolder()
+
+    private val blockStore = FakeBlockStore()
+
+    /** Ion's phone; replaced to give the account a new identity key. */
+    private var ionNow = Phone("ion", 2)
+
+    /** Ana's phone as the app opens it: per-account records, Block Store, registered as device 1. */
+    private fun anaSource(accounts: AccountKeys): LibsignalSealerSource {
+        val session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
+        return LibsignalSealerSource({ DeviceRegistration.Result.Registered(1) }, accounts, { session }) { account ->
+            listOf(ionNow).filter { it.account == account }.map { it.bundle() }
+        }
+    }
+
+    /** First install: the account's identity is made (as device registration does) and backed up. */
+    private suspend fun firstInstall(): LibsignalSealerSource {
+        val accounts = AccountKeys(folder.root.resolve("keys"), TestBlobCipher(), blockStore)
+        LocalIdentity(accounts.records(ANA.id), accounts.backup(ANA.id)).resolve(false, NoReshare)
+        return anaSource(accounts)
+    }
+
+    /** App data and its Keystore key gone, Block Store kept. */
+    private fun reinstall(): LibsignalSealerSource {
+        folder.root.resolve("keys").deleteRecursively()
+        return anaSource(AccountKeys(folder.root.resolve("keys"), TestBlobCipher(), blockStore))
+    }
+
+    private suspend fun LibsignalSealerSource.chat() = checkNotNull(sealers()) { "sealers not ready" }.chat
+
+    private suspend fun trustIon() {
+        val sealed = firstInstall().chat().seal("hi".encodeToByteArray(), ChatDevice("ion", 2))
+        assertArrayEquals(
+            "hi".encodeToByteArray(),
+            LibsignalMessageSealer(LibsignalSessions(ionNow.store, ionNow.address, directory))
+                .open(sealed.type, sealed.content, ChatDevice(ANA.id, 1))
+        )
+        val ionKey = Base64.getEncoder().encodeToString(ionNow.store.identityKeyPair.publicKey.serialize())
+        assertEquals(
+            "the app saves the trusted peer with the identity",
+            listOf(TrustedPeer("ion", ionKey, pending = false)),
+            BlockStoreIdentityBackup(blockStore, ANA.id).loadPeers()
+        )
+    }
+
+    @Test
+    fun afterAReinstallTheTrustedPeersSameKeyIsStillAccepted() = runTest {
+        trustIon()
+
+        val sealed = reinstall().chat().seal("again".encodeToByteArray(), ChatDevice("ion", 2))
+
+        assertEquals("a new session after the reinstall", CiphertextType.PreKey, sealed.type)
+        assertArrayEquals(
+            "again".encodeToByteArray(),
+            LibsignalMessageSealer(LibsignalSessions(ionNow.store, ionNow.address, directory))
+                .open(sealed.type, sealed.content, ChatDevice(ANA.id, 1))
+        )
+    }
+
+    @Test
+    fun afterAReinstallAChangedKeyForTheTrustedPeerIsRefusedNotAFirstContact() = runTest {
+        trustIon()
+        ionNow = Phone("ion", 2) // a new identity key for the same account
+
+        val restored = reinstall().chat()
+
+        val refused =
+            assertThrows(MessageSealerException::class.java) {
+                kotlinx.coroutines.runBlocking { restored.seal("hi".encodeToByteArray(), ChatDevice("ion", 2)) }
+            }
+        assertTrue("an untrusted identity, not a first contact", refused.cause is UntrustedIdentityException)
     }
 }

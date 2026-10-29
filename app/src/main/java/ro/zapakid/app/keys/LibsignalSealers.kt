@@ -1,6 +1,7 @@
 package ro.zapakid.app.keys
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -167,12 +168,22 @@ class LibsignalSealerSource(
         val current = session() ?: return null
         val registered = registration.register() as? DeviceRegistration.Result.Registered ?: return null
         val records = accounts.records(current.parent.id)
+        val backup = accounts.backup(current.parent.id)
         val identity =
-            (LocalIdentity(records, accounts.backup(current.parent.id)).resolve(true) {} as? LocalIdentity.State.Ready)
-                ?.identity ?: return null
+            (LocalIdentity(records, backup).resolve(true) {} as? LocalIdentity.State.Ready)?.identity ?: return null
+        // Trusted peers go to Block Store with the identity (security review M1), so a reinstall doesn't reset trust on
+        // first use. A failed save is retried on the next trust change and at the next start.
+        val store =
+            ZapaKidProtocolStore(records, identity) { peers ->
+                runBlocking { runCatching { backup.savePeers(peers) } }
+            }
+        runCatching {
+            val peers = store.trustedPeers()
+            if (backup.loadPeers() != peers) backup.savePeers(peers)
+        }
         val sessions =
             LibsignalSessions(
-                ZapaKidProtocolStore(records, identity),
+                store,
                 SignalProtocolAddress(current.parent.id, registered.deviceId),
                 bundles
             )
