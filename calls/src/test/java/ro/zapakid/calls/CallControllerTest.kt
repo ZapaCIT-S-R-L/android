@@ -14,10 +14,12 @@ import ro.zapakid.calls.api.CallSignal
 import ro.zapakid.calls.crypto.CallKeyManager
 import ro.zapakid.calls.crypto.KeyRing
 import ro.zapakid.calls.engine.EngineEvent
+import ro.zapakid.calls.ring.Ringback
 import ro.zapakid.calls.testing.ANA
 import ro.zapakid.calls.testing.FakeCallEngine
 import ro.zapakid.calls.testing.FakeCallsApi
 import ro.zapakid.calls.testing.FakeEvents
+import ro.zapakid.calls.testing.FakeRingback
 import ro.zapakid.calls.testing.ION
 import ro.zapakid.calls.testing.ME
 import ro.zapakid.calls.testing.TestSealer
@@ -30,10 +32,10 @@ class CallControllerTest {
     private val engine = FakeCallEngine()
     private val log = InMemoryCallLog()
 
-    private fun TestScope.controller() =
+    private fun TestScope.controller(ringback: Ringback = Ringback.Silent) =
         CallController(api, events, engine, TestSealer(ME), ME, log, backgroundScope, clock = {
             testScheduler.currentTime
-        })
+        }, ringback = ringback)
 
     /** Ana's phone as the key leader: seals her key to me. */
     private suspend fun anaSendsKey(vararg roster: ro.zapakid.calls.crypto.CallDevice) {
@@ -277,5 +279,82 @@ class CallControllerTest {
         assertEquals(EndReason.HungUp, entry.reason)
         assertEquals(65L, entry.durationSeconds)
         assertEquals(CallDirection.Outgoing, entry.direction)
+    }
+
+    @Test
+    fun theCallerHearsARingbackUntilTheOtherSideAnswers() = runTest {
+        val ringback = FakeRingback()
+        val calls = controller(ringback)
+
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+        assertEquals("the tone starts with the ringing call", listOf("start"), ringback.events)
+
+        events.roster(ME, ANA)
+        runCurrent()
+
+        assertEquals("and stops once the callee joins", listOf("start", "stop"), ringback.events)
+        assertFalse(ringback.playing)
+        assertEquals(CallState.Connecting, calls.state.value.phase)
+    }
+
+    @Test
+    fun theRingbackStopsWhenNobodyAnswers() = runTest {
+        val ringback = FakeRingback()
+        val calls = controller(ringback)
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+
+        advanceTimeBy(45_001)
+
+        assertEquals(CallState.Ended(EndReason.NoAnswer), calls.state.value.phase)
+        assertEquals(listOf("start", "stop"), ringback.events)
+    }
+
+    @Test
+    fun theRingbackStopsWhenTheCalleeDeclines() = runTest {
+        val ringback = FakeRingback()
+        val calls = controller(ringback)
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+
+        events.push(CallSignal.Declined(ANA.account))
+        runCurrent()
+
+        assertEquals(CallState.Ended(EndReason.Declined), calls.state.value.phase)
+        assertEquals(listOf("start", "stop"), ringback.events)
+    }
+
+    @Test
+    fun theRingbackStopsOnHangupAndOnAFailedStart() = runTest {
+        val hung = FakeRingback()
+        val calls = controller(hung)
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+
+        calls.hangup()
+        runCurrent()
+
+        assertEquals(CallState.Ended(EndReason.HungUp), calls.state.value.phase)
+        assertEquals(listOf("start", "stop"), hung.events)
+
+        api.failCreate = IllegalStateException("network")
+        val failed = FakeRingback()
+        controller(failed).startCall("conv-1", "Ana")
+        runCurrent()
+
+        assertEquals("a call that never gets off the ground is silent too", listOf("start", "stop"), failed.events)
+    }
+
+    @Test
+    fun theCalleeHearsNoRingback() = runTest {
+        val ringback = FakeRingback()
+        val calls = controller(ringback)
+
+        calls.incoming("call-1", "conv-1", "Ana")
+        runCurrent()
+
+        assertEquals("the ringback belongs to the caller alone", emptyList<String>(), ringback.events)
+        assertEquals(CallState.Ringing, calls.state.value.phase)
     }
 }
