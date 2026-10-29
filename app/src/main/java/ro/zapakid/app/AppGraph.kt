@@ -30,6 +30,7 @@ import ro.zapakid.app.family.HttpFamilyApi
 import ro.zapakid.app.family.KidSessionStore
 import ro.zapakid.app.shell.ChatTokenClient
 import ro.zapakid.app.shell.SealerSource
+import ro.zapakid.app.shell.Sealers
 import ro.zapakid.app.shell.Services
 import ro.zapakid.app.shell.ShellDeps
 import ro.zapakid.app.shell.ShellSessions
@@ -152,32 +153,32 @@ class AppGraph(
     private suspend fun buildServices(): Services? {
         // The libsignal sealers are wired here once the key-setup PRs land (android #12, #17).
         val sealers = SealerSource.None.sealers() ?: return null
-        val me = runCatching { chatTokens.identity() }.getOrNull() ?: return null
-        val deviceId = me.device.toIntOrNull() ?: return null
+        val me = runCatching { chatTokens.identity() }.getOrNull()
+        val deviceId = me?.device?.toIntOrNull()
+        return if (me == null || deviceId == null) null else newServices(sealers, me.account, me.device, deviceId)
+    }
+
+    /** The chat stack, its sync and the call controller, all on the session's scope. */
+    private fun newServices(sealers: Sealers, account: String, device: String, deviceId: Int): Services {
         val callsUrl = BuildConfig.CALLS_BASE_URL.toHttpUrl()
         val chatApi = HttpChatApi(BuildConfig.CHAT_BASE_URL.toHttpUrl(), http, chatTokens)
         val chats =
-            ChatRepository(
-                chatApi,
-                sessions.stores.forAccount(me.account),
-                sealers.chat,
-                ChatDevice(me.account, deviceId)
-            )
+            ChatRepository(chatApi, sessions.stores.forAccount(account), sealers.chat, ChatDevice(account, deviceId))
         val sync = ChatSync(chats, chatApi, chatApi)
         val syncJob = sessionScope.launch { sync.run() }
         val callsApi = HttpCallsApi(callsUrl, http, chatTokens)
         val calls =
             CallController(
                 callsApi,
-                CallEventsClient(callsUrl, http, chatTokens, CallDevice(me.account, me.device))::connect,
+                CallEventsClient(callsUrl, http, chatTokens, CallDevice(account, device))::connect,
                 WebRtcCallEngine(app, callsApi),
                 sealers.calls,
-                CallDevice(me.account, me.device),
+                CallDevice(account, device),
                 callLog,
                 sessionScope,
                 CallPeople.Default
             )
-        return Services(me.account, chats, sync, calls, syncJob)
+        return Services(account, chats, sync, calls, syncJob)
     }
 }
 

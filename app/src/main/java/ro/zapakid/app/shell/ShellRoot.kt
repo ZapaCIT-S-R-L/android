@@ -24,7 +24,9 @@ class ShellDeps(val session: SignedInSession<Services>, val callLog: CallLog)
 @Composable
 fun ShellRoot(deps: ShellDeps, kid: Boolean, family: @Composable () -> Unit) {
     LaunchedEffect(deps.session) { deps.session.start() }
-    val s by deps.session.services.collectAsState()
+    val services by deps.session.services.collectAsState()
+    // A plain local, not the delegated property: the lambdas below need the smart cast to a non-null Services.
+    val s = services
     val call = s?.calls?.state?.collectAsState()?.value ?: CallUiState()
     val log by deps.callLog.entries.collectAsState()
     AppShell(
