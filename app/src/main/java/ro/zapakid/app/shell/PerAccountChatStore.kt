@@ -37,9 +37,13 @@ class PerAccountChatStore(
         return opened
     }
 
-    /** Signs the store out: nothing stays open, and the next account starts from a closed store. */
+    /**
+     * Closes [id]'s store, and only if it is still the open one: a teardown that finishes after the next account
+     * signed in must not close that account's database.
+     */
     @Synchronized
-    fun close() {
+    fun close(id: String) {
+        if (account != id) return
         val previous = store ?: return
         store = null
         account = null

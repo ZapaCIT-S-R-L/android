@@ -55,7 +55,7 @@ class PerAccountChatStoreTest {
         val stores = newStores()
         val a = stores.forAccount("acc-a")
 
-        stores.close()
+        stores.close("acc-a")
 
         assertEquals(listOf(a), closed)
         assertEquals("nothing has switched yet", 0, switches)
@@ -72,12 +72,26 @@ class PerAccountChatStoreTest {
         val stores = newStores()
         val a = stores.forAccount("acc-a")
 
-        stores.close()
+        stores.close("acc-a")
         val again = stores.forAccount("acc-a")
 
         assertSame("its own store, nobody else's", a, again)
         assertEquals(listOf("acc-a", "acc-a"), opened)
         assertEquals(0, switches)
+    }
+
+    @Test
+    fun aLateCloseForAnAccountThatHasAlreadyGoneDoesNotTouchTheCurrentOne() {
+        val stores = newStores()
+        val a = stores.forAccount("acc-a")
+        val b = stores.forAccount("acc-b")
+
+        // A's teardown finishes after B signed in: it must not close B's database.
+        stores.close("acc-a")
+
+        assertEquals("A's store was closed once, by the switch", listOf(a), closed)
+        assertSame("B still has its own open store", b, stores.forAccount("acc-b"))
+        assertEquals(listOf("acc-a", "acc-b"), opened)
     }
 
     @Test
