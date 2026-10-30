@@ -43,7 +43,10 @@ fun ZapaKidApp(
         return
     }
     when (val s = state) {
-        is AuthUiState.SignedOut ->
+        is AuthUiState.SignedOut -> {
+            // A sign-out forgets this phone's setup, so signing in again registers the new session even for the same
+            // parent: the server binds a device to the session that registered it.
+            LaunchedEffect(Unit) { deviceSetup.reset() }
             SignInScreen(
                 busy = s.busy,
                 error = s.error,
@@ -52,6 +55,7 @@ fun ZapaKidApp(
                 onApple = { viewModel.signInWithApple(apple) },
                 onKidPhone = { kidMode = true }
             )
+        }
 
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
 
