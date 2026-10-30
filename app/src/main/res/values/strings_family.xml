@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="family_title">My family</string>
+    <string name="family_parents">Parents</string>
+    <string name="family_parent">Parent</string>
+    <string name="family_invite_parent">Invite the other parent</string>
+    <string name="family_kids">Kids</string>
+    <string name="family_no_kids">No kids yet. Add your first one!</string>
+    <string name="family_add_kid">Add a kid</string>
+    <string name="family_save_kid">Add</string>
+    <string name="family_cancel">Cancel</string>
+    <string name="family_done">Done</string>
+    <string name="family_nickname">Nickname</string>
+    <string name="family_nickname_hint">Just a nickname, no real name needed.</string>
+    <string name="family_pick_robot">Pick a robot</string>
+    <string name="family_robot_n">Robot %1$d</string>
+    <string name="family_grade">Grade</string>
+    <string name="family_pair_phone">Pair phone</string>
+    <string name="family_pair_title">Pair %1$s’s phone</string>
+    <string name="family_pair_body">On your kid’s phone, open ZapaKid, tap “This is a kid’s phone” and scan this code. It works once, for 5 minutes.</string>
+    <string name="family_invite_title">Invite the other parent</string>
+    <string name="family_invite_body">The other parent signs in to ZapaKid and scans this code. It works once, for 3 days.</string>
+    <string name="family_error_network">No connection. Check the internet and try again.</string>
+    <string name="family_error_too_many">Too many open codes. Wait until one is used or expires.</string>
+    <string name="family_error_invalid_code">This code doesn’t work any more. Ask for a new one.</string>
+    <string name="family_error_already">You already have a family with kids or another parent.</string>
+    <string name="family_error_too_many_kids">A family can have up to 12 kids.</string>
+    <string name="family_error_server">Something went wrong. Try again in a moment.</string>
+    <string name="grade_not_set">No grade set</string>
+    <string name="grade_kindergarten">Kindergarten</string>
+    <string name="grade_preparatory">Preparatory class</string>
+    <string name="grade_n">Grade %1$d</string>
+    <string name="kid_phone">This is a kid’s phone</string>
+    <string name="kid_pair_title">Hi! Let’s connect your phone</string>
+    <string name="kid_pair_body">Ask your mum or dad to show you the QR code in ZapaKid, then tap the button.</string>
+    <string name="kid_pair_scan">Scan the code</string>
+    <string name="kid_pair_working">Connecting…</string>
+    <string name="kid_pair_done">Your phone is connected to your family!</string>
+    <string name="kid_pair_hello">Hi %1$s!</string>
+    <string name="kid_pair_try_again">Try again</string>
+    <string name="kid_pair_back">Back</string>
+</resources>
