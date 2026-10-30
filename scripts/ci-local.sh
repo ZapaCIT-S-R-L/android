@@ -13,7 +13,7 @@ if pgrep -x xcodebuild >/dev/null; then echo "xcodebuild is running: one heavy b
 tmp=$(mktemp -d)
 
 echo "== Gradle: build, unit tests, lint"
-./gradlew assembleDebug assembleRelease testDebugUnitTest lintDebug ktlintCheck detekt
+./gradlew assembleDebug assembleRelease bundleRelease testDebugUnitTest lintDebug ktlintCheck detekt
 python3 - <<'PY'
 import glob, re
 t = f = 0

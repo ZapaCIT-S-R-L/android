@@ -9,7 +9,7 @@ rm -f gradle/verification-metadata.xml
 ./gradlew --no-configuration-cache --write-verification-metadata sha256 \
   --init-script gradle/aapt2-all-platforms.init.gradle.kts \
   resolveAapt2AllPlatforms \
-  assembleDebug assembleRelease testDebugUnitTest assembleDebugAndroidTest \
+  assembleDebug assembleRelease bundleRelease testDebugUnitTest assembleDebugAndroidTest \
   lintDebug ktlintCheck detekt cyclonedxBom \
   ${WITH_DEVICE:+connectedDebugAndroidTest}
 # IDE downloads (sources, javadoc) aren't verified; they never reach a build.

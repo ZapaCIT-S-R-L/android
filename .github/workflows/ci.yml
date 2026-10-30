@@ -1,5 +1,5 @@
 # Checks every pull request and every push to main. No secrets are used here, so PRs from forks are safe.
-#   build    wrapper checksum, then debug and (unsigned) release APKs
+#   build    wrapper checksum, then debug and (unsigned) release APKs and the release AAB
 #   unit     JVM unit tests (JUnit), then the contract check of their HTTP exchanges against api's openapi.yaml
 #   ui       Compose UI and instrumented tests on an Android emulator (KVM): ./gradlew connectedDebugAndroidTest
 #   lint     Android lint, ktlint, detekt, actionlint (workflows)
@@ -38,7 +38,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-      - run: ./gradlew assembleDebug assembleRelease
+      - run: ./gradlew assembleDebug assembleRelease bundleRelease
 
   unit:
     if: github.event_name != 'schedule'
