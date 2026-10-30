@@ -39,6 +39,7 @@ class SessionLifecycleTest {
     private var builds = 0
     private var gate = CompletableDeferred<Unit>().also { it.complete(Unit) }
     private var buildGate: CompletableDeferred<Unit>? = null
+    private var failBuild = false
     private lateinit var sessions: ShellSessions<FakeOwned>
     private lateinit var scope: CoroutineScope
 
@@ -63,16 +64,21 @@ class SessionLifecycleTest {
                     // The account is fixed when the build starts, not when a suspended build resumes.
                     val mine = account
                     buildGate?.await()
-                    sessions.stores.forAccount(mine)
-                    workers[mine] =
-                        this.scope.launch {
-                            try {
-                                awaitCancellation()
-                            } finally {
-                                events += "sync stopped $mine"
+                    if (failBuild) {
+                        failBuild = false
+                        null
+                    } else {
+                        sessions.stores.forAccount(mine)
+                        workers[mine] =
+                            this.scope.launch {
+                                try {
+                                    awaitCancellation()
+                                } finally {
+                                    events += "sync stopped $mine"
+                                }
                             }
-                        }
-                    FakeOwned(mine, events, gate) { listOfNotNull(workers[mine]) }
+                        FakeOwned(mine, events, gate) { listOfNotNull(workers[mine]) }
+                    }
                 }
             )
     }
@@ -224,6 +230,35 @@ class SessionLifecycleTest {
         assertEquals("and B is published once, not rebuilt", 2, builds)
 
         // B's sync is still running; the test scope must not be left with unfinished work.
+        sessions.signedOut()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun aQueuedSignInSurvivesAStaleBuildThatFails() = runTest {
+        buildGate = CompletableDeferred()
+        failBuild = true
+        harness(this)
+        sessions.session.start()
+        advanceUntilIdle()
+
+        sessions.signedOut()
+        advanceUntilIdle()
+        account = "acc-b"
+        sessions.session.start()
+        advanceUntilIdle()
+        assertNull("nothing is published while the stale build is suspended", sessions.session.services.value)
+
+        // The stale build resumes and fails: it produced nothing, so there is nothing to release — but the sign-in
+        // queued behind it must still be built.
+        buildGate?.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("the failed stale build did not take the queued sign-in with it", 2, builds)
+        assertEquals("acc-b", sessions.session.services.value?.account)
+        assertEquals("only B's store was ever opened", listOf("acc-b"), opened)
+        assertTrue(closed.isEmpty())
+
         sessions.signedOut()
         advanceUntilIdle()
     }

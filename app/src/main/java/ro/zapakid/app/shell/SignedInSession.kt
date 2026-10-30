@@ -57,14 +57,19 @@ class SignedInSession<S : OwnedSession>(
                 var attempt = started
                 while (true) {
                     shutdown.awaitPending()
-                    val built = runCatching { build() }.getOrNull() ?: return@launch
+                    val built = runCatching { build() }.getOrNull()
                     if (attempt == generation) {
+                        // The signed-in account's own attempt: publish it, or stop if it failed — a later
+                        // composition calls start() again and retries.
+                        if (built == null) return@launch
                         shutdown.attach(built)
                         state.value = built
                         return@launch
                     }
-                    // Signed out while this was building: give it up, then build for whoever asked meanwhile.
-                    shutdown.releaseOrphan(built).join()
+                    // Stale: that account signed out mid-build. Give up whatever it produced, then honour a sign-in
+                    // that was queued while this attempt was in flight — including one queued behind a failure,
+                    // which would otherwise leave the next account on "setting up" for good.
+                    if (built != null) shutdown.releaseOrphan(built).join()
                     if (!queued) return@launch
                     attempt = generation
                     buildingGeneration = attempt
