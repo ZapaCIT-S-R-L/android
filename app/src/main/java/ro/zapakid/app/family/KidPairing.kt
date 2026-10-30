@@ -109,12 +109,9 @@ class KidPairingViewModel(
     val state: StateFlow<KidPairingState> = mutableState
 
     private fun restore(): KidPairingState {
-        val session = store.load() ?: return KidPairingState.Waiting
-        if (isExpired(session)) {
-            store.clear()
-            return KidPairingState.Waiting
-        }
-        return KidPairingState.Paired(session)
+        val session = store.load()
+        if (session != null && isExpired(session)) store.clear()
+        return session?.takeUnless { isExpired(it) }?.let { KidPairingState.Paired(it) } ?: KidPairingState.Waiting
     }
 
     /** An unreadable expiry counts as expired: fail closed and pair again. */
@@ -129,13 +126,11 @@ class KidPairingViewModel(
      * Runs a kid-authenticated call with the stored session. An expired session, or a 401 from the server, clears
      * the stored session and returns to pairing (the error is rethrown); any other failure leaves the pairing alone.
      */
-    @Suppress("TooGenericExceptionCaught")
     suspend fun <T> withSession(block: suspend (KidSession) -> T): T {
         val session = (mutableState.value as? KidPairingState.Paired)?.session
-            ?: throw FamilyApiException(UNAUTHORIZED, "not_paired", "not paired")
-        if (isExpired(session)) {
+        if (session == null || isExpired(session)) {
             reset()
-            throw FamilyApiException(UNAUTHORIZED, "session_expired", "kid session expired")
+            throw FamilyApiException(UNAUTHORIZED, "no_valid_session", "not paired or kid session expired")
         }
         try {
             return block(session)
