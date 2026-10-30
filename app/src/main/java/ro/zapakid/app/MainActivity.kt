@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
     private val graph get() = (application as ZapaKidApplication).graph
 
     private val authViewModel: AuthViewModel by viewModels {
-        viewModelFactory { initializer { AuthViewModel(graph.authRepository) } }
+        viewModelFactory { initializer { AuthViewModel(graph.authRepository, graph::signedOut) } }
     }
 
     private val familyViewModel: FamilyViewModel by viewModels {
@@ -44,7 +44,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ZapaKidTheme {
-                ZapaKidApp(authViewModel, google = google, apple = apple, family = familyViewModel, kid = kidViewModel)
+                ZapaKidApp(
+                    authViewModel,
+                    google = google,
+                    apple = apple,
+                    family = familyViewModel,
+                    kid = kidViewModel,
+                    shell = graph.shell
+                )
             }
         }
     }

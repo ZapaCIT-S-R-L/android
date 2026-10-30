@@ -38,6 +38,13 @@ test("the shared test fakes are not part of any shipped source set", () => {
   }
 });
 
+test("a release bundle without the libsignal sealers fails to build", () => {
+  const app = readFileSync("app/build.gradle.kts", "utf8");
+  assert.match(app, /val checkRealSealers by tasks\.registering/);
+  assert.match(app, /include\("\*\*\/Libsignal\*Sealer\*\.kt"\)/);
+  assert.match(app, /it\.name == "bundleRelease" \}\.configureEach \{ dependsOn\(checkRealSealers\) \}/);
+});
+
 test("a function returning a sealer is not an implementation (review of #46, item 6)", () => {
   assert.equal(implementsSealer("fun sealer(): CallKeySealer = real"), null);
   assert.equal(implementsSealer("private fun make(a: Int, b: String): MessageSealer {"), null);

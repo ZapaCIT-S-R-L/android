@@ -32,4 +32,9 @@ class InMemoryCallLog(private val limit: Int = 200) : CallLog {
     override val entries: StateFlow<List<CallLogEntry>> = state
 
     override fun add(entry: CallLogEntry) = state.update { (listOf(entry) + it).take(limit) }
+
+    /** Drops the log: an account switch must not show the next account the previous one's calls. */
+    fun clear() {
+        state.value = emptyList()
+    }
 }

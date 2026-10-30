@@ -1,6 +1,9 @@
 package ro.zapakid.calls
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -356,5 +359,74 @@ class CallControllerTest {
 
         assertEquals("the ringback belongs to the caller alone", emptyList<String>(), ringback.events)
         assertEquals(CallState.Ringing, calls.state.value.phase)
+    }
+
+    @Test
+    fun signingOutMidCallReleasesEverythingEvenWhenTheShellScopeIsAlreadyGone() = runTest {
+        val shellScope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        val calls =
+            CallController(
+                api,
+                events,
+                engine,
+                TestSealer(ME),
+                ME,
+                log,
+                shellScope,
+                clock = { testScheduler.currentTime }
+            )
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+        events.roster(ME, ANA)
+        engine.emit(EngineEvent.Connected)
+        runCurrent()
+        anaSendsKey(ANA, ME)
+        runCurrent()
+        assertEquals(CallState.InCall, calls.state.value.phase)
+
+        // The shell is being disposed, so its scope is cancelling: a teardown launched into it would never start,
+        // which is how a signed-out call used to keep the microphone and the socket alive. Only the app's own
+        // cleanup scope is still running.
+        shellScope.cancel()
+        val cleanup = CoroutineScope(StandardTestDispatcher(testScheduler))
+
+        calls.signOut(cleanup).join()
+        runCurrent()
+
+        assertEquals(CallState.Ended(EndReason.HungUp), calls.state.value.phase)
+        assertEquals(EndReason.HungUp, log.entries.value.single().reason)
+        assertTrue("the peer connection and the microphone are gone", engine.stopped)
+        assertTrue("the engine's own scope is given up as well", engine.released)
+        assertTrue("the event socket is closed", events.closed)
+        assertEquals("leave call-1", api.calls.last())
+        assertFalse("the call keys are wiped", calls.state.value.encrypted)
+        cleanup.cancel()
+    }
+
+    @Test
+    fun signingOutAnIdleShellStillGivesUpTheEngine() = runTest {
+        val calls = controller()
+
+        calls.signOut(this).join()
+        runCurrent()
+
+        assertTrue("no call ran, but the engine's scope must not linger", engine.released)
+        assertFalse(engine.stopped)
+        assertTrue(log.entries.value.isEmpty())
+    }
+
+    @Test
+    fun signingOutWhileRingingStopsTheRingbackToo() = runTest {
+        val ringback = FakeRingback()
+        val calls = controller(ringback)
+        calls.startCall("conv-1", "Ana")
+        runCurrent()
+        assertEquals(listOf("start"), ringback.events)
+
+        calls.signOut(this).join()
+        runCurrent()
+
+        assertEquals(listOf("start", "stop"), ringback.events)
+        assertEquals(CallState.Ended(EndReason.HungUp), calls.state.value.phase)
     }
 }

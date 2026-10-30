@@ -90,6 +90,9 @@ class CallController(
 
     private var call: Job? = null
     private var timer: Job? = null
+
+    /** The teardown of the call that ended: a sign-out waits for it before the chat store closes. */
+    private var releasing: Job? = null
     private var connection: CallEventsConnection? = null
     private var keys: CallKeyManager? = null
     private var ring = KeyRing()
@@ -339,7 +342,7 @@ class CallController(
             }
     }
 
-    private fun dispatch(event: CallEvent) {
+    private fun dispatch(event: CallEvent, on: CoroutineScope = scope) {
         val before = mutableState.value.phase
         val after = CallStateMachine.reduce(before, event)
         if (after == before) return
@@ -350,11 +353,11 @@ class CallController(
             after == CallState.Calling -> ringback.start()
             before == CallState.Calling -> ringback.stop()
         }
-        if (after is CallState.Ended) finish(after.reason)
+        if (after is CallState.Ended) finish(after.reason, on)
         if (after == CallState.Idle) mutableState.value = CallUiState()
     }
 
-    private fun finish(reason: EndReason) {
+    private fun finish(reason: EndReason, on: CoroutineScope = scope) {
         if (finished) return
         finished = true
         val state = mutableState.value
@@ -379,12 +382,43 @@ class CallController(
                 group = state.group
             )
         )
-        scope.launch {
+        releasing = release(state.callId, socket, mediaStarted, wasJoined, on)
+    }
+
+    /**
+     * Closes the event socket, stops the media engine and tells the service we left. [on] runs it: normally this
+     * controller's own scope, but a sign-out passes one that outlives the composition, because a launch into an
+     * already cancelling scope never starts and the microphone would stay open.
+     */
+    private fun release(
+        callId: String?,
+        socket: CallEventsConnection?,
+        media: Boolean,
+        wasJoined: Boolean,
+        on: CoroutineScope
+    ): Job = on.launch {
+        withContext(NonCancellable) {
+            socket?.close()
+            if (media) runCatchingApi { engine.stop() }
+            if (wasJoined && callId != null) runCatchingApi { api.leave(callId) }
+        }
+    }
+
+    /**
+     * Leaves the signed-in shell: a logout, or an account switch. An active call ends exactly as a hang-up does —
+     * logged, keys wiped, socket closed, media stopped — and the engine is then given up for good, so its own scope
+     * and native handles cannot outlive the account that started the call. Everything runs on [cleanup], a scope
+     * that outlives the composition; this controller's own scope is cancelling by now, so a launch into it would
+     * never start. Returns the teardown, for a caller that must wait for it before closing the chat store.
+     */
+    fun signOut(cleanup: CoroutineScope): Job {
+        if (busy) dispatch(CallEvent.Hangup, cleanup)
+        val teardown = releasing
+        releasing = null
+        return cleanup.launch {
             withContext(NonCancellable) {
-                socket?.close()
-                if (mediaStarted) runCatchingApi { engine.stop() }
-                val callId = state.callId
-                if (wasJoined && callId != null) runCatchingApi { api.leave(callId) }
+                teardown?.join()
+                engine.release()
             }
         }
     }
