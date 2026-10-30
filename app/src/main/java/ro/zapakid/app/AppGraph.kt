@@ -24,6 +24,11 @@ import ro.zapakid.app.family.EncryptedKidSessionStore
 import ro.zapakid.app.family.FamilyApi
 import ro.zapakid.app.family.HttpFamilyApi
 import ro.zapakid.app.family.KidSessionStore
+import ro.zapakid.app.keys.AccountKeys
+import ro.zapakid.app.keys.DeviceRegistrar
+import ro.zapakid.app.keys.DeviceRegistration
+import ro.zapakid.app.keys.HttpDeviceApi
+import ro.zapakid.app.keys.PlayBlockStoreApi
 
 /** Production wiring. Emulator tests pass fakes for the network, storage, age signal and Custom Tab. */
 class AppGraph(
@@ -33,6 +38,7 @@ class AppGraph(
     ageSignals: AgeSignalsSource? = null,
     familyApi: FamilyApi? = null,
     kidStore: KidSessionStore? = null,
+    private val deviceRegistrar: DeviceRegistrar? = null,
     /** Opens Apple's authorize page. A Custom Tab in the app; tests replace the browser. */
     val openCustomTab: (
         Activity,
@@ -78,5 +84,20 @@ class AppGraph(
     /** A paired kid phone's session, encrypted like the parent session. */
     val kidSessionStore: KidSessionStore by lazy {
         kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreBlobCipher())
+    }
+
+    /** This phone's libsignal records: Keystore-encrypted files in noBackupFilesDir (never backed up). */
+    private val accountKeys by lazy {
+        AccountKeys(File(app.noBackupFilesDir, "keys"), KeystoreBlobCipher("zapakid.keys.v1"), PlayBlockStoreApi(app))
+    }
+
+    val deviceRegistration: DeviceRegistrar by lazy {
+        deviceRegistrar ?: DeviceRegistration(
+            accounts = accountKeys,
+            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http),
+            session = authRepository::currentSession,
+            // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
+            reshare = {}
+        )
     }
 }

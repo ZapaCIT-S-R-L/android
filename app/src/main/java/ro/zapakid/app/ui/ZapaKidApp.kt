@@ -26,6 +26,7 @@ import ro.zapakid.app.family.KidPairingViewModel
 @Composable
 fun ZapaKidApp(
     viewModel: AuthViewModel,
+    deviceSetup: DeviceSetupViewModel,
     google: IdTokenProvider,
     apple: AppleBrowser,
     family: FamilyViewModel? = null,
@@ -42,7 +43,10 @@ fun ZapaKidApp(
         return
     }
     when (val s = state) {
-        is AuthUiState.SignedOut ->
+        is AuthUiState.SignedOut -> {
+            // A sign-out forgets this phone's setup, so signing in again registers the new session even for the same
+            // parent: the server binds a device to the session that registered it.
+            LaunchedEffect(Unit) { deviceSetup.reset() }
             SignInScreen(
                 busy = s.busy,
                 error = s.error,
@@ -51,15 +55,24 @@ fun ZapaKidApp(
                 onApple = { viewModel.signInWithApple(apple) },
                 onKidPhone = { kidMode = true }
             )
+        }
 
         is AuthUiState.Agreement -> AgreementScreen(onContinue = viewModel::acceptAgreement)
 
-        is AuthUiState.SignedIn ->
+        is AuthUiState.SignedIn -> {
+            LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
+            val device by deviceSetup.state.collectAsStateWithLifecycle()
             if (family == null) {
-                HomeScreen(parent = s.parent, onSignOut = viewModel::logout)
+                HomeScreen(s.parent, device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
             } else {
-                FamilyRoute(family, onSignOut = viewModel::logout)
+                FamilyRoute(
+                    family,
+                    onSignOut = viewModel::logout,
+                    device = device,
+                    onRetryDevice = deviceSetup::retry
+                )
             }
+        }
 
         AuthUiState.Blocked -> BlockedScreen(onBack = viewModel::backToSignIn)
 
@@ -71,7 +84,12 @@ fun ZapaKidApp(
 
 /** The parent's family screen, loaded (and created on first open) when shown. */
 @Composable
-fun FamilyRoute(family: FamilyViewModel, onSignOut: () -> Unit) {
+fun FamilyRoute(
+    family: FamilyViewModel,
+    onSignOut: () -> Unit,
+    device: DeviceSetupState? = null,
+    onRetryDevice: () -> Unit = {}
+) {
     val state by family.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { if (state.family == null) family.load() }
     Column(Modifier.fillMaxSize()) {
@@ -85,6 +103,7 @@ fun FamilyRoute(family: FamilyViewModel, onSignOut: () -> Unit) {
                 onDismissError = family::clearError
             )
         }
+        if (device != null) DeviceSetupStatus(device, onRetryDevice)
         TextButton(onClick = onSignOut) { Text(stringResource(R.string.sign_out)) }
     }
 }

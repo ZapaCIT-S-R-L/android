@@ -20,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ro.zapakid.app.auth.Nonces
 import ro.zapakid.app.auth.Pkce
+import ro.zapakid.app.keys.DeviceRegistration
 import ro.zapakid.app.testing.APPLE_CODE
 import ro.zapakid.app.testing.FakeAgeSignals
 import ro.zapakid.app.testing.FakeAuthApi
@@ -59,6 +60,7 @@ class AppleAppLinkTest {
                 api = api,
                 store = InMemorySessionStore(),
                 ageSignals = FakeAgeSignals(),
+                deviceRegistrar = { DeviceRegistration.Result.Registered(1) },
                 openCustomTab = { activity: Activity, uri: Uri ->
                     opened += uri
                     // What happens after Apple: the API's callback redirects the browser to the App Link.
