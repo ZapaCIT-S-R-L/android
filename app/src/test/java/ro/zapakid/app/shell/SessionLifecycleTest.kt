@@ -60,8 +60,9 @@ class SessionLifecycleTest {
                 },
                 build = {
                     builds++
-                    buildGate?.await()
+                    // The account is fixed when the build starts, not when a suspended build resumes.
                     val mine = account
+                    buildGate?.await()
                     sessions.stores.forAccount(mine)
                     workers[mine] =
                         this.scope.launch {
