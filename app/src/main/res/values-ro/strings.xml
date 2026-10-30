@@ -28,4 +28,8 @@
     <string name="age_declined_try_again">Încearcă din nou</string>
     <string name="attestation_failed_title">Telefonul nu poate fi verificat</string>
     <string name="attestation_failed_body">Pentru siguranța familiilor, ZapaKid funcționează doar instalat din Google Play, pe un telefon care trece verificările Google. Instalează ZapaKid din Google Play, actualizează serviciile Google Play și încearcă din nou.</string>
+    <string name="device_setting_up">Se configurează criptarea end-to-end pe acest telefon…</string>
+    <string name="device_ready">Criptarea end-to-end este configurată pe acest telefon.</string>
+    <string name="device_waiting_for_reshare">Se așteaptă ca celălalt telefon al tău să-ți partajeze cheile de criptare. Deschide ZapaKid pe el.</string>
+    <string name="device_failed">Criptarea nu a putut fi configurată pe acest telefon.</string>
 </resources>

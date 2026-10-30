@@ -99,19 +99,22 @@ class HttpAuthApi(
             .use { response -> readOrThrow(response) }
     }
 
-    private fun readOrThrow(response: Response): String {
-        val text = response.body.string()
-        if (response.isSuccessful) return text
-        val error = runCatching { json.decodeFromString(ErrorBody.serializer(), text) }.getOrNull()
-        throw AuthApiException(
-            status = response.code,
-            code = error?.error?.code ?: "http_${response.code}",
-            message = error?.error?.message ?: "Server error ${response.code}",
-            retryAfterSeconds = response.header("Retry-After")?.trim()?.toLongOrNull()
-        )
-    }
+    private fun readOrThrow(response: Response): String = response.readOrThrow(json)
 
     private companion object {
         val EMPTY = ByteArray(0).toRequestBody(null)
     }
+}
+
+/** The body of a 2xx answer, or the API's error as [AuthApiException] ({"error": {"code", "message"}}). */
+internal fun Response.readOrThrow(json: Json): String {
+    val text = body.string()
+    if (isSuccessful) return text
+    val error = runCatching { json.decodeFromString(ErrorBody.serializer(), text) }.getOrNull()
+    throw AuthApiException(
+        status = code,
+        code = error?.error?.code ?: "http_$code",
+        message = error?.error?.message ?: "Server error $code",
+        retryAfterSeconds = header("Retry-After")?.trim()?.toLongOrNull()
+    )
 }

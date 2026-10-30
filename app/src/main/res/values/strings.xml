@@ -28,4 +28,8 @@
     <string name="age_declined_try_again">Try again</string>
     <string name="attestation_failed_title">This phone can\'t be checked</string>
     <string name="attestation_failed_body">To keep families safe, ZapaKid only works when installed from Google Play on a phone that passes Google\'s checks. Install ZapaKid from Google Play, update Google Play services, and try again.</string>
+    <string name="device_setting_up">Setting up end-to-end encryption on this phone…</string>
+    <string name="device_ready">End-to-end encryption is set up on this phone.</string>
+    <string name="device_waiting_for_reshare">Waiting for your other phone to share your encryption keys. Open ZapaKid on it.</string>
+    <string name="device_failed">Couldn\'t set up encryption on this phone.</string>
 </resources>

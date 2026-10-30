@@ -14,6 +14,7 @@ import ro.zapakid.app.family.FamilyViewModel
 import ro.zapakid.app.family.GmsQrScanner
 import ro.zapakid.app.family.KidPairingViewModel
 import ro.zapakid.app.ui.AuthViewModel
+import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp
 import ro.zapakid.app.ui.theme.ZapaKidTheme
 
@@ -22,6 +23,10 @@ class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModels {
         viewModelFactory { initializer { AuthViewModel(graph.authRepository, graph::signedOut) } }
+    }
+
+    private val deviceSetup: DeviceSetupViewModel by viewModels {
+        viewModelFactory { initializer { DeviceSetupViewModel(graph.deviceRegistration) } }
     }
 
     private val familyViewModel: FamilyViewModel by viewModels {
@@ -46,6 +51,7 @@ class MainActivity : ComponentActivity() {
             ZapaKidTheme {
                 ZapaKidApp(
                     authViewModel,
+                    deviceSetup,
                     google = google,
                     apple = apple,
                     family = familyViewModel,
