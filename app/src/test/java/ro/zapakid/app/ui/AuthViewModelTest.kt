@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import ro.zapakid.app.auth.AgeRange
@@ -39,7 +40,8 @@ class AuthViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG))
+    private fun viewModel(onSignedOut: () -> Unit = {}) =
+        AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG), onSignedOut)
 
     @Test
     fun withoutASessionTheSignInScreenShows() = runTest {
@@ -142,5 +144,17 @@ class AuthViewModelTest {
 
         assertEquals(AuthUiState.SignedOut(), vm.state.value)
         assertEquals(null, store.session)
+    }
+
+    @Test
+    fun logoutTellsTheGraphToShutTheSessionDownOnceTheSessionIsGone() = runTest {
+        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        var sessionWhenNotified: Session? = Session("still set", FAR_FUTURE, ANA)
+        val vm = viewModel { sessionWhenNotified = store.session }
+
+        vm.logout()
+
+        assertNull("the shutdown runs after the sign-out, not before it", sessionWhenNotified)
+        assertEquals(AuthUiState.SignedOut(), vm.state.value)
     }
 }

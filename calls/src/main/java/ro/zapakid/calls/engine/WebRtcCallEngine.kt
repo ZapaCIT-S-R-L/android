@@ -243,7 +243,7 @@ class WebRtcCallEngine(private val context: Context, private val api: CallsApi) 
     }
 
     /** Releases the engine for good (the app's process ends or calls are switched off). */
-    fun release() = scope.cancel()
+    override fun release() = scope.cancel()
 
     private fun createFactory(): PeerConnectionFactory {
         PeerConnectionFactory.initialize(
