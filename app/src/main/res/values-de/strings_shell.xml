@@ -4,4 +4,6 @@
     <string name="tab_calls">Anrufe</string>
     <string name="tab_family">Familie</string>
     <string name="setting_up">Sicherer Chat wird auf diesem Handy vorbereitet… Es klappt, sobald die Familienschlüssel eingerichtet sind.</string>
+    <string name="setup_retry_body">Noch keine Verbindung. Wir versuchen es weiter.</string>
+    <string name="setup_try_again">Nochmal versuchen</string>
 </resources>

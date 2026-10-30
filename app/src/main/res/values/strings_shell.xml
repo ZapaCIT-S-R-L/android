@@ -4,4 +4,6 @@
     <string name="tab_calls">Calls</string>
     <string name="tab_family">Family</string>
     <string name="setting_up">Getting secure chat ready on this phone… It works as soon as your family keys are set up.</string>
+    <string name="setup_retry_body">Couldn\'t connect yet. We\'ll keep trying.</string>
+    <string name="setup_try_again">Try again</string>
 </resources>
