@@ -20,7 +20,9 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.signal.libsignal.protocol.IdentityKeyPair
+import ro.zapakid.app.auth.Attestation
 import ro.zapakid.app.auth.AuthApiException
+import ro.zapakid.app.auth.RequestAttestation
 import ro.zapakid.app.testing.ContractRecorder
 
 /** Device registration against a mocked API following openapi.yaml ("Draft: Devices and keys"). */
@@ -161,6 +163,54 @@ class HttpDeviceApiTest {
                 "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
             )
         )
+    }
+
+    private class FakeAttestation(val token: String? = "integrity-token-1") : RequestAttestation {
+        val hashes = mutableListOf<String>()
+
+        override suspend fun token(requestHash: String): String? {
+            hashes += requestHash
+            return token
+        }
+    }
+
+    @Test
+    fun registrationCarriesAPlayIntegrityTokenBoundToTheExactBody() = runTest {
+        val attestation = FakeAttestation()
+        val attested = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client(), attestation)
+        server.enqueue(MockResponse(code = 201, body = """{"deviceId":3}"""))
+
+        attested.register("zks_tok0000000000000000000000000000000000000000", keys)
+
+        val request = server.takeRequest()
+        assertEquals("integrity-token-1", request.headers["ZapaKid-Attestation"])
+        assertEquals(listOf(Attestation.requestHash(request.body!!.toByteArray())), attestation.hashes)
+    }
+
+    @Test
+    fun theIdentityLookupIsNotAttested() = runTest {
+        val attestation = FakeAttestation()
+        val attested = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client(), attestation)
+        val key = Base64.getEncoder().encodeToString(IdentityKeyPair.generate().publicKey.serialize())
+        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"$key","changes":[]}"""))
+
+        attested.accountIdentityKey(
+            "zks_tok0000000000000000000000000000000000000000",
+            "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+        )
+
+        assertEquals(null, server.takeRequest().headers["ZapaKid-Attestation"])
+        assertTrue(attestation.hashes.isEmpty())
+    }
+
+    @Test
+    fun withoutATokenRegistrationGoesOutWithoutTheHeader() = runTest {
+        val attested = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client(), FakeAttestation(token = null))
+        server.enqueue(MockResponse(code = 201, body = """{"deviceId":3}"""))
+
+        attested.register("zks_tok0000000000000000000000000000000000000000", keys)
+
+        assertEquals(null, server.takeRequest().headers["ZapaKid-Attestation"])
     }
 }
 
