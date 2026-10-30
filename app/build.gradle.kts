@@ -28,8 +28,9 @@ android {
         applicationId = "ro.zapakid.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        // The Play workflow passes the release tag and its run number; local builds stay 1 / 0.1.0.
+        versionCode = providers.gradleProperty("zapakid.versionCode").map(String::toInt).getOrElse(1)
+        versionName = providers.gradleProperty("zapakid.versionName").getOrElse("0.1.0")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Public identifiers, not secrets. Override with -P or ~/.gradle/gradle.properties; empty = not set up.
@@ -58,8 +59,23 @@ android {
         )
     }
 
+    // Release signing with the Play upload key, only in the Play workflow (protected `play` environment), from
+    // environment variables. Never a keystore or password in the repository; without them the release is unsigned.
+    val uploadKeystore = providers.environmentVariable("ZAPAKID_UPLOAD_KEYSTORE")
+    signingConfigs {
+        if (uploadKeystore.isPresent) {
+            create("upload") {
+                storeFile = file(uploadKeystore.get())
+                storePassword = providers.environmentVariable("ZAPAKID_UPLOAD_STORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("ZAPAKID_UPLOAD_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("ZAPAKID_UPLOAD_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (uploadKeystore.isPresent) signingConfig = signingConfigs.getByName("upload")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -109,6 +125,14 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Contract test: the JVM tests record their HTTP exchanges here; scripts/contract-check.js checks them against the
+// API's openapi.yaml (pinned in contract/api-commit).
+tasks.withType<Test>().configureEach {
+    val exchanges = layout.buildDirectory.file("contract/exchanges.jsonl")
+    systemProperty("contract.out", exchanges.get().asFile.path)
+    doFirst { exchanges.get().asFile.delete() }
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
@@ -155,5 +179,6 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 }

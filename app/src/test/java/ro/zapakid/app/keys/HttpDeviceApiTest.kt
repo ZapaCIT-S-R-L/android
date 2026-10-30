@@ -1,5 +1,6 @@
 package ro.zapakid.app.keys
 
+import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -18,7 +19,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.signal.libsignal.protocol.IdentityKeyPair
 import ro.zapakid.app.auth.AuthApiException
+import ro.zapakid.app.testing.ContractRecorder
 
 /** Device registration against a mocked API following openapi.yaml ("Draft: Devices and keys"). */
 class HttpDeviceApiTest {
@@ -38,7 +41,7 @@ class HttpDeviceApiTest {
     @Before
     fun setUp() {
         server.start()
-        api = HttpDeviceApi(server.url("/v1/"), OkHttpClient())
+        api = HttpDeviceApi(server.url("/v1/"), ContractRecorder.client())
     }
 
     @After
@@ -58,12 +61,12 @@ class HttpDeviceApiTest {
     fun registerPostsTheDeviceKeysWithTheSessionAndReturnsTheDeviceId() = runTest {
         server.enqueue(MockResponse(code = 201, body = """{"deviceId":3}"""))
 
-        assertEquals(3, api.register("zks_tok", keys))
+        assertEquals(3, api.register("zks_tok0000000000000000000000000000000000000000", keys))
 
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/v1/devices", request.url.encodedPath)
-        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+        assertEquals("Bearer zks_tok0000000000000000000000000000000000000000", request.headers["Authorization"])
         assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
         val body = Json.parseToJsonElement(request.body!!.utf8()).jsonObject
         assertEquals(
@@ -76,42 +79,91 @@ class HttpDeviceApiTest {
 
     @Test
     fun aDeviceIdOutsideTheContractRangeIsRejected() = runTest {
-        server.enqueue(MockResponse(code = 201, body = """{"deviceId":128}"""))
+        server.enqueue(
+            MockResponse(code = 201, headers = offSpec("robustness: a server bug"), body = """{"deviceId":128}""")
+        )
 
-        assertEquals("invalid_response", expectError { api.register("zks_tok", keys) }.code)
+        assertEquals(
+            "invalid_response",
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.code
+        )
     }
 
     @Test
     fun registrationErrorsCarryTheApiCode() = runTest {
-        server.enqueue(MockResponse(code = 409, body = """{"error":{"code":"identity_mismatch","message":"x"}}"""))
-        assertEquals("identity_mismatch", expectError { api.register("zks_tok", keys) }.code)
+        server.enqueue(
+            MockResponse(
+                code = 409,
+                headers = offSpec(API_GAP_DEVICE_ERRORS),
+                body = """{"error":{"code":"identity_mismatch","message":"x"}}"""
+            )
+        )
+        assertEquals(
+            "identity_mismatch",
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.code
+        )
 
-        server.enqueue(MockResponse(code = 401, body = """{"error":{"code":"unauthorized","message":"x"}}"""))
-        assertTrue(expectError { api.register("zks_tok", keys) }.isUnauthorized)
+        server.enqueue(
+            MockResponse(
+                code = 401,
+                headers = offSpec(API_GAP_DEVICE_ERRORS),
+                body = """{"error":{"code":"unauthorized","message":"x"}}"""
+            )
+        )
+        assertTrue(expectError { api.register("zks_tok0000000000000000000000000000000000000000", keys) }.isUnauthorized)
 
         server.enqueue(
             MockResponse(
                 code = 429,
-                headers = headersOf("Retry-After", "60"),
+                headers = headersOf("Retry-After", "60", ContractRecorder.OFF_SPEC, API_GAP_DEVICE_ERRORS),
                 body = """{"error":{"code":"rate_limited","message":"x"}}"""
             )
         )
-        assertEquals(60L, expectError { api.register("zks_tok", keys) }.retryAfterSeconds)
+        assertEquals(
+            60L,
+            expectError {
+                api.register("zks_tok0000000000000000000000000000000000000000", keys)
+            }.retryAfterSeconds
+        )
     }
 
     @Test
     fun theAccountsRegisteredIdentityKeyComesFromTheKeyDirectory() = runTest {
-        server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQECAw==","changes":[]}"""))
+        val key = IdentityKeyPair.generate().publicKey.serialize()
+        val body = """{"identityKey":"${Base64.getEncoder().encodeToString(key)}","changes":[]}"""
+        server.enqueue(MockResponse(code = 200, body = body))
         assertArrayEquals(
-            byteArrayOf(5, 1, 2, 3),
-            api.accountIdentityKey("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11")
+            key,
+            api.accountIdentityKey(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
         )
         val request = server.takeRequest()
         assertEquals("GET", request.method)
         assertEquals("/v1/accounts/7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11/identity", request.url.encodedPath)
-        assertEquals("Bearer zks_tok", request.headers["Authorization"])
+        assertEquals("Bearer zks_tok0000000000000000000000000000000000000000", request.headers["Authorization"])
 
-        server.enqueue(MockResponse(code = 404, body = """{"error":{"code":"not_found","message":"x"}}"""))
-        assertNull(api.accountIdentityKey("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+        server.enqueue(
+            MockResponse(
+                code = 404,
+                headers = offSpec("API gap: 404 for an account without an identity is not in the contract"),
+                body = """{"error":{"code":"not_found","message":"x"}}"""
+            )
+        )
+        assertNull(
+            api.accountIdentityKey(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
+        )
     }
 }
+
+private const val API_GAP_DEVICE_ERRORS = "API gap: POST /v1/devices declares only 201"
+
+private fun offSpec(reason: String) = headersOf(ContractRecorder.OFF_SPEC, reason)

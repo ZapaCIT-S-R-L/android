@@ -33,3 +33,14 @@ updates:
       actions:
         applies-to: version-updates
         patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      npm:
+        applies-to: version-updates
+        patterns: ["*"]
