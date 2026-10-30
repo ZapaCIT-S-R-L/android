@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_title">Chats</string>
+    <string name="chat_empty">No chats yet. Say hi to your family!</string>
+    <plurals name="chat_unread">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <string name="chat_back">Back</string>
+    <string name="chat_call">Call %1$s</string>
+    <string name="chat_photo">Send a photo</string>
+    <string name="chat_photo_received">Photo</string>
+    <string name="chat_photo_open">Show photo</string>
+    <string name="chat_type">Write a message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_voice">Record a voice message</string>
+    <string name="chat_voice_stop">Stop and send</string>
+    <string name="chat_voice_note">Voice message, %1$d s. Play</string>
+    <string name="chat_sending">Sending…</string>
+    <string name="chat_failed">Not sent. Tap to try again</string>
+    <string name="chat_call_message">Call</string>
+    <string name="chat_unsupported">This message needs a newer ZapaKid. Please update the app.</string>
+</resources>

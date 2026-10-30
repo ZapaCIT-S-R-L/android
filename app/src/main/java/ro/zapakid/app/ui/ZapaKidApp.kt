@@ -23,6 +23,7 @@ import ro.zapakid.app.family.KidPairingState
 import ro.zapakid.app.family.KidPairingViewModel
 
 /** The app's root: picks the screen for the sign-in state; a paired kid phone goes straight to the kid's app. */
+@Suppress("CyclomaticComplexMethod") // the app's one router: a branch per sign-in and pairing state
 @Composable
 fun ZapaKidApp(
     viewModel: AuthViewModel,
@@ -30,13 +31,19 @@ fun ZapaKidApp(
     google: IdTokenProvider,
     apple: AppleBrowser,
     family: FamilyViewModel? = null,
-    kid: KidPairingViewModel? = null
+    kid: KidPairingViewModel? = null,
+    shell: ro.zapakid.app.shell.ShellDeps? = null
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var kidMode by rememberSaveable { mutableStateOf(false) }
     val kidState = kid?.state?.collectAsStateWithLifecycle()?.value
     // A paired phone is a kid phone: stay on the kid's screen even when the session is revoked, so it shows pairing.
     LaunchedEffect(kidState is KidPairingState.Paired) { if (kidState is KidPairingState.Paired) kidMode = true }
+    // Paired and the shell is wired: the kid's phone goes straight to its own chats and calls.
+    if (shell != null && kidState is KidPairingState.Paired) {
+        ro.zapakid.app.shell.ShellRoot(shell, kid = true, family = {})
+        return
+    }
     val showKid = kidMode || kidState is KidPairingState.Paired
     if (kid != null && kidState != null && showKid) {
         KidPairScreen(kidState, onScan = kid::scan, onTryAgain = kid::tryAgain, onBack = { kidMode = false })
@@ -62,15 +69,27 @@ fun ZapaKidApp(
         is AuthUiState.SignedIn -> {
             LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
             val device by deviceSetup.state.collectAsStateWithLifecycle()
-            if (family == null) {
-                HomeScreen(s.parent, device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
-            } else {
-                FamilyRoute(
-                    family,
-                    onSignOut = viewModel::logout,
-                    device = device,
-                    onRetryDevice = deviceSetup::retry
-                )
+            when {
+                family == null ->
+                    HomeScreen(s.parent, device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
+
+                shell == null ->
+                    FamilyRoute(
+                        family,
+                        onSignOut = viewModel::logout,
+                        device = device,
+                        onRetryDevice = deviceSetup::retry
+                    )
+
+                else ->
+                    ro.zapakid.app.shell.ShellRoot(shell, kid = false) {
+                        FamilyRoute(
+                            family,
+                            onSignOut = viewModel::logout,
+                            device = device,
+                            onRetryDevice = deviceSetup::retry
+                        )
+                    }
             }
         }
 

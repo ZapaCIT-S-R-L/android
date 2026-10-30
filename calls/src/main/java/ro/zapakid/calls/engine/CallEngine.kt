@@ -39,4 +39,10 @@ interface CallEngine {
     fun setSpeaker(on: Boolean)
 
     suspend fun stop()
+
+    /**
+     * Gives up the engine for good: its own scope and whatever it holds beyond one call. [stop] ends a call and
+     * leaves the engine reusable, this does not. Default: nothing to give up.
+     */
+    fun release() = Unit
 }

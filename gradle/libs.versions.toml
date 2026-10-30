@@ -23,6 +23,9 @@ okhttp = "5.5.1"
 kotlinx-serialization = "1.12.0"
 kotlinx-coroutines = "1.11.0"
 browser = "1.10.0"
+# Encrypted chat database (SQLCipher community edition, BSD-style licence).
+sqlcipher = "4.20.0"
+androidx-sqlite = "2.7.1"
 # QR codes: draw (ZXing, Apache-2.0) and scan (Google code scanner: camera in Play services, no camera permission).
 zxing = "3.5.4"
 code-scanner = "16.1.0"
@@ -53,6 +56,8 @@ androidx-browser = { module = "androidx.browser:browser", version.ref = "browser
 webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 play-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "code-scanner" }
+sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }

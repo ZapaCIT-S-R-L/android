@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
     private val graph get() = (application as ZapaKidApplication).graph
 
     private val authViewModel: AuthViewModel by viewModels {
-        viewModelFactory { initializer { AuthViewModel(graph.authRepository) } }
+        viewModelFactory { initializer { AuthViewModel(graph.authRepository, graph::signedOut) } }
     }
 
     private val deviceSetup: DeviceSetupViewModel by viewModels {
@@ -55,7 +55,8 @@ class MainActivity : ComponentActivity() {
                     google = google,
                     apple = apple,
                     family = familyViewModel,
-                    kid = kidViewModel
+                    kid = kidViewModel,
+                    shell = graph.shell
                 )
             }
         }

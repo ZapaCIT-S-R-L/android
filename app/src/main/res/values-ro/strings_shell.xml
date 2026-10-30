@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_chats">Mesaje</string>
+    <string name="tab_calls">Apeluri</string>
+    <string name="tab_family">Familie</string>
+    <string name="setting_up">Pregătim chatul securizat pe acest telefon… Merge imediat ce cheile familiei sunt gata.</string>
+</resources>
