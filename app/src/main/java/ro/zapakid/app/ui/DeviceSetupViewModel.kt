@@ -26,8 +26,14 @@ class DeviceSetupViewModel(private val registrar: DeviceRegistrar) : ViewModel()
     private val _state = MutableStateFlow<DeviceSetupState>(DeviceSetupState.Idle)
     val state: StateFlow<DeviceSetupState> = _state.asStateFlow()
 
-    fun start() {
-        if (_state.value == DeviceSetupState.Idle) run()
+    private var account: String? = null
+
+    /** Sets up [accountId] on this phone once; another account (after a logout) is set up again from scratch. */
+    fun start(accountId: String) {
+        if (accountId != account) {
+            account = accountId
+            run()
+        }
     }
 
     fun retry() {

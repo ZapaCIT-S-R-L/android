@@ -15,6 +15,19 @@ interface RequestAttestation {
     suspend fun token(requestHash: String): String?
 }
 
+/**
+ * A token for [body], or null. Never fails the request: without a token the server applies its policy
+ * (403 attestation_failed in production).
+ */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+suspend fun RequestAttestation?.tokenFor(body: ByteArray): String? = try {
+    this?.token(Attestation.requestHash(body))
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    null
+}
+
 object Attestation {
     const val HEADER = "ZapaKid-Attestation"
 

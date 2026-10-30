@@ -20,10 +20,9 @@ import ro.zapakid.app.auth.PlayIntegrityAttestation
 import ro.zapakid.app.auth.SessionStore
 import ro.zapakid.app.auth.Tls
 import ro.zapakid.app.auth.signin.AppleSignInConfig
-import ro.zapakid.app.keys.BlockStoreIdentityBackup
+import ro.zapakid.app.keys.AccountKeys
 import ro.zapakid.app.keys.DeviceRegistrar
 import ro.zapakid.app.keys.DeviceRegistration
-import ro.zapakid.app.keys.EncryptedRecordStore
 import ro.zapakid.app.keys.HttpDeviceApi
 import ro.zapakid.app.keys.PlayBlockStoreApi
 
@@ -54,13 +53,15 @@ class AppGraph(
             .build()
     }
 
+    private val integrity by lazy { PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER) }
+
     val authRepository: AuthRepository by lazy {
         AuthRepository(
             api =
                 api ?: HttpAuthApi(
                     BuildConfig.API_BASE_URL.toHttpUrl(),
                     http,
-                    PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+                    integrity
                 ),
             store = store ?: EncryptedSessionStore(File(app.noBackupFilesDir, "session.bin"), KeystoreBlobCipher()),
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
@@ -69,15 +70,14 @@ class AppGraph(
     }
 
     /** This phone's libsignal records: Keystore-encrypted files in noBackupFilesDir (never backed up). */
-    private val keyRecords by lazy {
-        EncryptedRecordStore(File(app.noBackupFilesDir, "keys"), KeystoreBlobCipher("zapakid.keys.v1"))
+    private val accountKeys by lazy {
+        AccountKeys(File(app.noBackupFilesDir, "keys"), KeystoreBlobCipher("zapakid.keys.v1"), PlayBlockStoreApi(app))
     }
 
     val deviceRegistration: DeviceRegistrar by lazy {
         deviceRegistrar ?: DeviceRegistration(
-            records = keyRecords,
-            backup = { BlockStoreIdentityBackup(PlayBlockStoreApi(app), it) },
-            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http),
+            accounts = accountKeys,
+            api = HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http, integrity),
             session = authRepository::currentSession,
             // TODO(reshare): ask another family phone by QR (next PR); until then the phone just waits.
             reshare = {}
