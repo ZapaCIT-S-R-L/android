@@ -1,0 +1,106 @@
+# Builds a signed release AAB and uploads it to the Google Play internal testing track for ro.zapakid.app.
+# By hand only (Actions -> play-internal -> Run workflow, from main), in the protected `play` environment, which holds
+# the only copies of the secrets (Settings -> Environments -> play):
+#   PLAY_UPLOAD_KEYSTORE_BASE64   the upload keystore (PKCS12), base64
+#   PLAY_UPLOAD_KEYSTORE_PASSWORD its password
+#   PLAY_UPLOAD_KEY_ALIAS         the key alias
+#   PLAY_UPLOAD_KEY_PASSWORD      the key password (PKCS12: the same as the keystore password)
+#   PLAY_SERVICE_ACCOUNT_JSON     the publishing service account key (Play Console: release to testing tracks only)
+# Without the keystore secrets the job skips with a notice. With the keystore but no service account it builds the
+# signed AAB and keeps it as a workflow artifact (the first upload of a new app goes through Play Console by hand).
+name: play-internal
+
+on:
+  workflow_dispatch:
+    inputs:
+      status:
+        description: "Release status on the internal track (draft until the app's store listing is complete)"
+        type: choice
+        options: [draft, completed]
+        default: draft
+
+permissions:
+  contents: read
+
+concurrency:
+  group: play-internal
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: play
+    env:
+      HAS_KEYSTORE: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 != '' }}
+      HAS_PUBLISHER: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - name: Check the secrets
+        run: |
+          if [ "$HAS_KEYSTORE" != true ]; then
+            echo "::notice::Play upload skipped: the play environment has no upload keystore secrets yet (see the PR that added this workflow)."
+          elif [ "$HAS_PUBLISHER" != true ]; then
+            echo "::notice::No Play service account yet: building the signed AAB as an artifact only; upload skipped."
+          fi
+      - if: env.HAS_KEYSTORE == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - if: env.HAS_KEYSTORE == 'true'
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - if: env.HAS_KEYSTORE == 'true'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+      - if: env.HAS_KEYSTORE == 'true'
+        name: Build the signed release AAB
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 }}
+          ZAPAKID_UPLOAD_STORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+          ZAPAKID_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+          ZAPAKID_UPLOAD_KEY_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          umask 077
+          export ZAPAKID_UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.p12"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$ZAPAKID_UPLOAD_KEYSTORE"
+          version=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          version=${version:-v0.1.0}
+          # versionCode: 1000 + this workflow's run number, always increasing.
+          ./gradlew --no-configuration-cache bundleRelease \
+            -Pzapakid.versionName="${version#v}" -Pzapakid.versionCode=$((1000 + RUN_NUMBER))
+          rm -f "$ZAPAKID_UPLOAD_KEYSTORE"
+          echo "RELEASE_NAME=$version ($((1000 + RUN_NUMBER)))" >> "$GITHUB_ENV"
+      - if: always()
+        name: Remove the keystore
+        run: rm -f "$RUNNER_TEMP/upload.p12"
+      - if: env.HAS_KEYSTORE == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zapakid-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          retention-days: 7
+      - if: env.HAS_KEYSTORE == 'true' && env.HAS_PUBLISHER == 'true'
+        id: google
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          create_credentials_file: false
+          export_environment_variables: false
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - if: env.HAS_KEYSTORE == 'true' && env.HAS_PUBLISHER == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - if: env.HAS_KEYSTORE == 'true' && env.HAS_PUBLISHER == 'true'
+        name: Upload to the internal track
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google.outputs.access_token }}
+          STATUS: ${{ inputs.status }}
+        run: node scripts/play-upload.js app/build/outputs/bundle/release/app-release.aab "$RELEASE_NAME" "$STATUS"

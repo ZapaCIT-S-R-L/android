@@ -50,7 +50,7 @@ class AuthViewModelTest {
 
     @Test
     fun aStoredSessionGoesStraightToTheSignedInState() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
         assertEquals(AuthUiState.SignedIn(ANA), viewModel().state.value)
     }
 
@@ -137,7 +137,7 @@ class AuthViewModelTest {
 
     @Test
     fun logoutReturnsToSignInAndForgetsTheSession() = runTest {
-        store.session = Session("zks_tok", FAR_FUTURE, ANA)
+        store.session = Session("zks_tok0000000000000000000000000000000000000000", FAR_FUTURE, ANA)
         val vm = viewModel()
 
         vm.logout()

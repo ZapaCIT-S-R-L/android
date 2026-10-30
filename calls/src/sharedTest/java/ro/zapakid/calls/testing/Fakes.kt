@@ -85,7 +85,9 @@ class FakeEvents :
         channel.trySend(signal)
     }
 
-    fun roster(vararg devices: CallDevice) = push(CallSignal.Roster(devices.map(::participant), ++epoch))
+    /** A roster; [leader] is the server's keyLeader (none: the key manager falls back to the lowest device id). */
+    fun roster(vararg devices: CallDevice, leader: CallDevice? = null) =
+        push(CallSignal.Roster(devices.map(::participant), ++epoch, keyLeader = leader))
 
     override fun sendKeys(epoch: Int, envelopes: List<KeyEnvelope>): Boolean = sentKeys.addAll(envelopes).let { true }
 

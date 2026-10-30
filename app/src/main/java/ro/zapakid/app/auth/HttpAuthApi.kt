@@ -49,18 +49,8 @@ class HttpAuthApi(
     private suspend fun post(path: String, body: String, attest: Boolean = false): String {
         val bytes = body.encodeToByteArray()
         val request = Request.Builder().url(endpoint(path)).post(bytes.toRequestBody(jsonType))
-        if (attest) attestationToken(bytes)?.let { request.header(Attestation.HEADER, it) }
+        if (attest) attestation.tokenFor(bytes)?.let { request.header(Attestation.HEADER, it) }
         return execute(request.build())
-    }
-
-    /** Never fails the request: without a token the server applies its policy (403 attestation_failed). */
-    @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private suspend fun attestationToken(body: ByteArray): String? = try {
-        attestation?.token(Attestation.requestHash(body))
-    } catch (e: kotlinx.coroutines.CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
     }
 
     private fun session(text: String): Session {

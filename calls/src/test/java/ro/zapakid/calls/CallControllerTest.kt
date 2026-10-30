@@ -25,6 +25,7 @@ import ro.zapakid.calls.testing.FakeEvents
 import ro.zapakid.calls.testing.FakeRingback
 import ro.zapakid.calls.testing.ION
 import ro.zapakid.calls.testing.ME
+import ro.zapakid.calls.testing.MIA
 import ro.zapakid.calls.testing.TestSealer
 
 /** The call as the screens see it, with a fake calls service and a fake media engine. */
@@ -100,6 +101,31 @@ class CallControllerTest {
         runCurrent()
         assertEquals(CallState.InCall, calls.state.value.phase)
         assertEquals(listOf(1), engine.rotations)
+    }
+
+    @Test
+    fun theServersKeyLeaderLeadsEvenWhenThisPhoneSortsFirst() = runTest {
+        val calls = controller()
+        assertTrue(calls.incoming("call-1", "conv-1", "Mia"))
+        runCurrent()
+        calls.accept()
+        runCurrent()
+
+        // Mia's iPhone called first, so the server names her the leader although acc-me sorts before acc-mia.
+        events.roster(MIA, ME, leader = MIA)
+        engine.emit(EngineEvent.Connected)
+        runCurrent()
+        assertEquals("this phone doesn't rotate", emptyList<Int>(), engine.rotations)
+        assertTrue(events.sentKeys.isEmpty())
+
+        val mia = CallKeyManager("call-1", MIA, TestSealer(MIA), KeyRing())
+        mia.onRoster(listOf(MIA, ME), serverEpoch = events.epoch, keyLeader = MIA).forEach {
+            events.push(CallSignal.Key(it))
+        }
+        runCurrent()
+
+        assertEquals(CallState.InCall, calls.state.value.phase)
+        assertEquals(listOf(events.epoch), engine.rotations)
     }
 
     @Test

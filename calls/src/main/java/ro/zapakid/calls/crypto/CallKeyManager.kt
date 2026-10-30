@@ -3,11 +3,11 @@ package ro.zapakid.calls.crypto
 import java.security.SecureRandom
 
 /**
- * Per-call key rotation, the same rules as iOS. The key leader is the device with the lowest [CallDevice.id]
- * (`<accountId>.<deviceId>`) in the roster. Whenever the set of devices changes (join or leave) the leader
- * makes a fresh random key for the next
- * epoch and seals it to every other device, so a device that left can't read what follows and one that joined
- * can't read what came before. Other devices accept a key only from the current leader, only for a newer epoch,
+ * Per-call key rotation, the same rules as iOS. The key leader is the one the calls service names in each roster
+ * (`keyLeader`, the longest-present participant), so every phone agrees on it whatever the join order. Whenever
+ * the set of devices changes (join or leave) the leader makes a fresh random key for the next epoch and seals it
+ * to every other device, so a device that left can't read what follows and one that joined can't read what came
+ * before. Other devices accept a key only from the current leader, only for a newer epoch,
  * and only when the sealed payload names this call and that epoch.
  */
 class CallKeyManager(
@@ -21,6 +21,7 @@ class CallKeyManager(
     private var keyedFor: Set<CallDevice> = emptySet()
     private var epoch = -1
     private var members: Set<CallDevice> = emptySet()
+    private var serverLeader: CallDevice? = null
 
     /** True once this phone holds a key made for the current set of devices (not one from before a join or leave). */
     var hasCurrentKey: Boolean = false
@@ -29,9 +30,17 @@ class CallKeyManager(
     /** Current epoch, -1 before the first key. */
     val currentEpoch: Int get() = epoch
 
-    /** Call on every roster update; returns the envelopes to send (empty unless this device is the leader). */
-    suspend fun onRoster(devices: List<CallDevice>, serverEpoch: Int? = null): List<KeyEnvelope> {
+    /**
+     * Call on every roster update with the server's epoch and `keyLeader`; returns the envelopes to send (empty
+     * unless this device is the leader).
+     */
+    suspend fun onRoster(
+        devices: List<CallDevice>,
+        serverEpoch: Int? = null,
+        keyLeader: CallDevice? = null
+    ): List<KeyEnvelope> {
         roster = (devices + self).distinct().sortedBy { it.id }
+        serverLeader = keyLeader
         val members = roster.toSet()
         if (members != this.members) {
             this.members = members
@@ -83,7 +92,9 @@ class CallKeyManager(
         null
     }
 
-    private fun leader(): CallDevice? = roster.minByOrNull { it.id }
+    // The server's keyLeader, as on iOS. Only when a roster carries none (an older server) fall back to the lowest
+    // device id; that rule can disagree with iOS, which follows the server.
+    private fun leader(): CallDevice? = serverLeader ?: roster.minByOrNull { it.id }
 
     /** Why the last envelope was rejected (no key material), for diagnostics. */
     var lastRejection: String? = null
@@ -94,5 +105,6 @@ class CallKeyManager(
         ring.clear()
         keyedFor = emptySet()
         roster = emptyList()
+        serverLeader = null
     }
 }

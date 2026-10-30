@@ -60,6 +60,8 @@ class LocalIdentity(private val records: EncryptedRecordStore, private val backu
                     usable(backedUp) != null -> backedUp!!.also {
                         records.put(KIND, KEY_PAIR, it)
                         records.remove(KIND, IN_CLOUD) // re-checked on the next run
+                        // A restored identity brings back whom it trusted: no fresh trust on first use.
+                        ZapaKidProtocolStore.restoreTrust(records, backup.loadPeers())
                     }
 
                     accountHasIdentity -> {
@@ -115,6 +117,11 @@ interface IdentityBackup {
 
     /** Whether [save] goes to an end-to-end encrypted cloud backup now (Block Store needs a screen lock for that). */
     suspend fun cloudBackupAvailable(): Boolean = false
+
+    /** The peers this account trusts, backed up with the identity. */
+    suspend fun loadPeers(): List<TrustedPeer>
+
+    suspend fun savePeers(peers: List<TrustedPeer>)
 }
 
 /** Asks another family phone to re-share the identity. TODO(reshare): the flow itself (a later PR); a stub for now. */
