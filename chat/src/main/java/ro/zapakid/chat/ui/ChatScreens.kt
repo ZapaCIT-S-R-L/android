@@ -45,7 +45,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import ro.zapakid.calls.ui.RobotAvatar
+import ro.zapakid.chat.ChatContent
 import ro.zapakid.chat.Conversation
 import ro.zapakid.chat.Message
 import ro.zapakid.chat.MessageKind
@@ -253,29 +255,7 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            when (message.kind) {
-                MessageKind.Text -> Text(message.text.orEmpty(), style = MaterialTheme.typography.bodyLarge)
-
-                MessageKind.Image -> {
-                    val bitmap = image(message)
-                    if (bitmap != null) {
-                        androidx.compose.foundation.Image(
-                            bitmap,
-                            contentDescription = stringResource(R.string.chat_photo_received),
-                            modifier = Modifier.widthIn(max = 260.dp)
-                        )
-                    } else {
-                        TextButton({ actions.play(message) }) { Text(stringResource(R.string.chat_photo_open)) }
-                    }
-                }
-
-                MessageKind.Voice -> {
-                    val seconds = (message.attachment?.durationMillis ?: 0) / MILLIS
-                    TextButton({ actions.play(message) }, Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.chat_voice_note, seconds))
-                    }
-                }
-            }
+            BubbleContent(message, actions, image)
             when (message.status) {
                 MessageStatus.Sending -> Text(
                     stringResource(R.string.chat_sending),
@@ -293,5 +273,42 @@ private fun Bubble(message: Message, group: Boolean, actions: ChatActions, image
     }
 }
 
-private const val MAX_TEXT = 4000
-private const val MILLIS = 1000
+/** The message itself: text, photo, voice note, a call, or a placeholder for content this app can't read. */
+@Composable
+private fun BubbleContent(message: Message, actions: ChatActions, image: (Message) -> ImageBitmap?) {
+    when (message.kind) {
+        MessageKind.Text -> Text(message.text.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+
+        MessageKind.Image -> {
+            val bitmap = image(message)
+            if (bitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap,
+                    contentDescription = stringResource(R.string.chat_photo_received),
+                    modifier = Modifier.widthIn(max = 260.dp)
+                )
+            } else {
+                TextButton({ actions.play(message) }) { Text(stringResource(R.string.chat_photo_open)) }
+            }
+        }
+
+        MessageKind.Voice -> {
+            val seconds = (message.attachment?.duration ?: 0.0).roundToInt()
+            TextButton({ actions.play(message) }, Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.chat_voice_note, seconds))
+            }
+        }
+
+        MessageKind.Call -> Text(
+            stringResource(R.string.chat_call_message),
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        MessageKind.Unsupported -> Text(
+            stringResource(R.string.chat_unsupported),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+private const val MAX_TEXT = ChatContent.MAX_TEXT

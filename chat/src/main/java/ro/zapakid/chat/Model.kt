@@ -8,31 +8,38 @@ data class ChatDevice(val account: String, val device: Int) {
     val id: String get() = "$account.$device"
 }
 
-enum class MessageKind { Text, Image, Voice }
+/** [Call]: "I'm calling you" (shows as a call in the chat). [Unsupported]: sealed content this app can't read yet. */
+enum class MessageKind { Text, Image, Voice, Call, Unsupported }
 
 enum class MessageStatus { Sending, Sent, Failed, Received }
 
-/** An encrypted attachment: its blob ID on the server and the key to open it (only inside the sealed message). */
+/**
+ * An encrypted attachment's pointer, travelling only inside the sealed message (the server never sees the key).
+ * Field names and units are the wire format shared with iOS (`AttachmentPointer`): see [ChatContent].
+ */
 @Serializable
 data class AttachmentRef(
     val id: String,
-    /** AES-256-GCM key, base64; travels only inside the end-to-end sealed message. */
+    /** AES-256-GCM key, base64. */
     val key: String,
-    val sha256: String,
-    val mime: String,
+    /** SHA-256 of the ciphertext, base64. */
+    val digest: String,
+    /** Ciphertext size in bytes. */
     val size: Long,
-    val durationMillis: Long? = null
+    val mimeType: String,
+    /** Voice messages: seconds. */
+    val duration: Double? = null
 ) {
-    override fun toString(): String = "AttachmentRef(id=$id, mime=$mime, size=$size)"
+    override fun toString(): String = "AttachmentRef(id=$id, mimeType=$mimeType, size=$size)"
 }
 
-/** What goes inside the seal: never seen by the server. */
-@Serializable
+/** What goes inside the seal: never seen by the server. On the wire as [ChatContent] version 1. */
 data class MessageBody(
     val id: String,
     val kind: MessageKind,
     val text: String? = null,
     val attachment: AttachmentRef? = null,
+    val callId: String? = null,
     val sentAt: Long
 )
 
@@ -47,8 +54,11 @@ data class Message(
     val sentAt: Long,
     val status: MessageStatus,
     /** Decrypted attachment cached on the phone (inside the encrypted store directory), if loaded. */
-    val localFile: String? = null
-)
+    val localFile: String? = null,
+    val callId: String? = null
+) {
+    val body: MessageBody get() = MessageBody(id, kind, text, attachment, callId, sentAt)
+}
 
 data class Conversation(
     val id: String,

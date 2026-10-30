@@ -39,6 +39,7 @@ fun ZapaKidApp(
     val kidState = kid?.state?.collectAsStateWithLifecycle()?.value
     // A paired phone is a kid phone: stay on the kid's screen even when the session is revoked, so it shows pairing.
     LaunchedEffect(kidState is KidPairingState.Paired) { if (kidState is KidPairingState.Paired) kidMode = true }
+    // Paired and the shell is wired: the kid's phone goes straight to its own chats and calls.
     if (shell != null && kidState is KidPairingState.Paired) {
         ro.zapakid.app.shell.ShellRoot(shell, kid = true, family = {})
         return
@@ -68,17 +69,27 @@ fun ZapaKidApp(
         is AuthUiState.SignedIn -> {
             LaunchedEffect(s.parent.id) { deviceSetup.start(s.parent.id) }
             val device by deviceSetup.state.collectAsStateWithLifecycle()
-            val retry = deviceSetup::retry
             when {
                 family == null ->
-                    HomeScreen(s.parent, device, onRetryDevice = retry, onSignOut = viewModel::logout)
+                    HomeScreen(s.parent, device, onRetryDevice = deviceSetup::retry, onSignOut = viewModel::logout)
 
                 shell == null ->
-                    FamilyRoute(family, onSignOut = viewModel::logout, device = device, onRetryDevice = retry)
+                    FamilyRoute(
+                        family,
+                        onSignOut = viewModel::logout,
+                        device = device,
+                        onRetryDevice = deviceSetup::retry
+                    )
 
-                else -> ro.zapakid.app.shell.ShellRoot(shell, kid = false) {
-                    FamilyRoute(family, onSignOut = viewModel::logout, device = device, onRetryDevice = retry)
-                }
+                else ->
+                    ro.zapakid.app.shell.ShellRoot(shell, kid = false) {
+                        FamilyRoute(
+                            family,
+                            onSignOut = viewModel::logout,
+                            device = device,
+                            onRetryDevice = deviceSetup::retry
+                        )
+                    }
             }
         }
 

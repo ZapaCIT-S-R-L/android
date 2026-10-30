@@ -82,4 +82,6 @@ fun preview(message: Message): String = when (message.kind) {
     ro.zapakid.chat.MessageKind.Text -> message.text.orEmpty()
     ro.zapakid.chat.MessageKind.Image -> "🖼️"
     ro.zapakid.chat.MessageKind.Voice -> "🎤"
+    ro.zapakid.chat.MessageKind.Call -> "📞"
+    ro.zapakid.chat.MessageKind.Unsupported -> "…"
 }
