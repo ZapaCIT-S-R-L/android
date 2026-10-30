@@ -38,7 +38,6 @@ class AppGraph(
     ageSignals: AgeSignalsSource? = null,
     familyApi: FamilyApi? = null,
     kidStore: KidSessionStore? = null,
-
     private val deviceRegistrar: DeviceRegistrar? = null,
     /** Opens Apple's authorize page. A Custom Tab in the app; tests replace the browser. */
     val openCustomTab: (

@@ -18,10 +18,13 @@ class FamilyDeviceSetupTest {
 
     @Test
     fun familyScreenKeepsTheEncryptionFailureAndRetryAction() {
-        val family = Family(
-            "f1", "Pop", parents = listOf(FamilyParent("p1", "Ana")),
-            kids = listOf(Kid("k1", "Mia", "robot-3", -1))
-        )
+        val family =
+            Family(
+                "f1",
+                "Pop",
+                parents = listOf(FamilyParent("p1", "Ana")),
+                kids = listOf(Kid("k1", "Mia", "robot-3", -1))
+            )
         val model = FamilyViewModel(StubFamilyApi(family), token = { "session" })
         var retries = 0
         compose.setContent {
