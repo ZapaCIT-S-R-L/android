@@ -34,6 +34,8 @@ fun ZapaKidApp(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var kidMode by rememberSaveable { mutableStateOf(false) }
     val kidState = kid?.state?.collectAsStateWithLifecycle()?.value
+    // A paired phone is a kid phone: stay on the kid's screen even when the session is revoked, so it shows pairing.
+    LaunchedEffect(kidState is KidPairingState.Paired) { if (kidState is KidPairingState.Paired) kidMode = true }
     val showKid = kidMode || kidState is KidPairingState.Paired
     if (kid != null && kidState != null && showKid) {
         KidPairScreen(kidState, onScan = kid::scan, onTryAgain = kid::tryAgain, onBack = { kidMode = false })
