@@ -136,15 +136,29 @@ class HttpDeviceApiTest {
         server.enqueue(MockResponse(code = 200, body = """{"identityKey":"BQECAw==","changes":[]}"""))
         assertArrayEquals(
             byteArrayOf(5, 1, 2, 3),
-            api.accountIdentityKey("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11")
+            api.accountIdentityKey(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
         )
         val request = server.takeRequest()
         assertEquals("GET", request.method)
         assertEquals("/v1/accounts/7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11/identity", request.url.encodedPath)
         assertEquals("Bearer zks_tok0000000000000000000000000000000000000000", request.headers["Authorization"])
 
-        server.enqueue(MockResponse(code = 404, body = """{"error":{"code":"not_found","message":"x"}}"""))
-        assertNull(api.accountIdentityKey("zks_tok", "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"))
+        server.enqueue(
+            MockResponse(
+                code = 404,
+                headers = offSpec("API gap: 404 for an account without an identity is not in the contract"),
+                body = """{"error":{"code":"not_found","message":"x"}}"""
+            )
+        )
+        assertNull(
+            api.accountIdentityKey(
+                "zks_tok0000000000000000000000000000000000000000",
+                "7f1c7a52-2f7e-4c2b-9a51-0b9a1c3f0e11"
+            )
+        )
     }
 
     private class FakeAttestation(val token: String? = "integrity-token-1") : RequestAttestation {
