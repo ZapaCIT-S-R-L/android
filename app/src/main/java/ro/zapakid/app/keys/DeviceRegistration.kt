@@ -83,7 +83,7 @@ class DeviceRegistration(
         return Result.Registered(deviceId)
     }
 
-    private companion object {
+    internal companion object {
         const val KIND = "device"
         const val DEVICE_ID = "device-id"
         const val PENDING_KEYS = "pending-device-keys"

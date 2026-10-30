@@ -153,27 +153,28 @@ class HttpPreKeyBundles(
 }
 
 /**
- * The live sealers for the shell: only once this phone is registered with the key directory (parents; kid phones
- * get keys with the kid key-setup work). Until then null, and chat and calls show "getting ready".
+ * The live sealers for the shell: only once this phone is registered with the key directory (parent or paired
+ * kid). Until then null, and chat and calls show "getting ready".
  */
 class LibsignalSealerSource(
     private val registration: DeviceRegistrar,
     private val accounts: AccountKeys,
-    private val session: () -> ro.zapakid.app.auth.Session?,
+    /** The account this phone holds keys for: the parent's id, or the paired kid's. */
+    private val accountId: () -> String?,
     private val bundles: PreKeyBundleSource
 ) : ro.zapakid.app.shell.SealerSource {
     @Suppress("ReturnCount") // each step can say "not ready yet"
     override suspend fun sealers(): ro.zapakid.app.shell.Sealers? {
-        val current = session() ?: return null
+        val account = accountId() ?: return null
         val registered = registration.register() as? DeviceRegistration.Result.Registered ?: return null
-        val records = accounts.records(current.parent.id)
+        val records = accounts.records(account)
         val identity =
-            (LocalIdentity(records, accounts.backup(current.parent.id)).resolve(true) {} as? LocalIdentity.State.Ready)
+            (LocalIdentity(records, accounts.backup(account)).resolve(true) {} as? LocalIdentity.State.Ready)
                 ?.identity ?: return null
         val sessions =
             LibsignalSessions(
                 ZapaKidProtocolStore(records, identity),
-                SignalProtocolAddress(current.parent.id, registered.deviceId),
+                SignalProtocolAddress(account, registered.deviceId),
                 bundles
             )
         return ro.zapakid.app.shell.Sealers(LibsignalCallKeySealer(sessions), LibsignalMessageSealer(sessions))

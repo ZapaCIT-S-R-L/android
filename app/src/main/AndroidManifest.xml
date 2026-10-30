@@ -5,6 +5,8 @@
     <!-- No cloud or device-to-device backup: chat keys and sessions must never come back through a backup.
          Chat-key recovery uses Android Block Store (end-to-end encrypted by Google) in a later change. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Retry key setup as soon as the network is back. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".ZapaKidApplication"

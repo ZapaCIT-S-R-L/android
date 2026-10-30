@@ -14,6 +14,11 @@ class AccountKeys(private val root: File, private val cipher: BlobCipher, privat
 
     fun backup(accountId: String): IdentityBackup = BlockStoreIdentityBackup(blockStore, accountId)
 
+    /** Deletes every key record of an account on this phone (a revoked kid phone). */
+    fun wipe(accountId: String) {
+        File(root, dirName(accountId)).deleteRecursively()
+    }
+
     private fun dirName(accountId: String): String {
         require(accountId.isNotBlank()) { "no account" }
         return MessageDigest.getInstance("SHA-256").digest(accountId.encodeToByteArray()).joinToString("") {

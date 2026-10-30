@@ -50,6 +50,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val kidState by kidViewModel.state.collectAsStateWithLifecycle()
+            val revocations by graph.kidRevocation.revocations.collectAsStateWithLifecycle()
+            androidx.compose.runtime.LaunchedEffect(revocations) { if (revocations > 0) kidViewModel.tryAgain() }
             ZapaKidTheme(role = roleFor(kidState)) {
                 ZapaKidApp(
                     authViewModel,

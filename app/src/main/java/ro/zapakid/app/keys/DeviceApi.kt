@@ -24,6 +24,13 @@ interface DeviceApi {
     suspend fun register(token: String, keys: DeviceKeys): Int
 
     suspend fun accountHasIdentity(token: String, accountId: String): Boolean
+
+    /**
+     * PUT /v1/keys/identity: replaces the account's identity with these keys and registers this phone as its only
+     * device. Only for a fresh session (a kid: under 10 minutes after pairing).
+     */
+    suspend fun changeIdentity(token: String, keys: DeviceKeys): Int =
+        throw UnsupportedOperationException("identity change not supported here")
 }
 
 class HttpDeviceApi(
@@ -44,6 +51,15 @@ class HttpDeviceApi(
         attestation.tokenFor(bytes)?.let { request.header(Attestation.HEADER, it) }
         val text = execute(request.build())
         val deviceId = json.decodeFromString(Registered.serializer(), text).deviceId
+        if (deviceId !in DEVICE_IDS) throw AuthApiException(HTTP_BAD_GATEWAY, "invalid_response", "Device ID $deviceId")
+        return deviceId
+    }
+
+    override suspend fun changeIdentity(token: String, keys: DeviceKeys): Int {
+        val bytes = json.encodeToString(DeviceKeys.serializer(), keys).encodeToByteArray()
+        val request = request("keys/identity", token).put(bytes.toRequestBody(jsonType))
+        attestation.tokenFor(bytes)?.let { request.header(Attestation.HEADER, it) }
+        val deviceId = json.decodeFromString(Registered.serializer(), execute(request.build())).deviceId
         if (deviceId !in DEVICE_IDS) throw AuthApiException(HTTP_BAD_GATEWAY, "invalid_response", "Device ID $deviceId")
         return deviceId
     }

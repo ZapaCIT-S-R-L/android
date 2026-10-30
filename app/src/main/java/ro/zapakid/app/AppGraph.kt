@@ -105,9 +105,54 @@ class AppGraph(
 
     /** Chat tokens for chat and calls, from the parent session or, on a kid phone, the kid session. */
     val chatTokens: ro.zapakid.app.shell.ChatTokenClient by lazy {
-        ro.zapakid.app.shell.ChatTokenClient(BuildConfig.API_BASE_URL.toHttpUrl(), http, session = {
-            authRepository.token() ?: kidSessionStore.load()?.token
-        })
+        ro.zapakid.app.shell.ChatTokenClient(
+            BuildConfig.API_BASE_URL.toHttpUrl(),
+            http,
+            session = { authRepository.token() ?: kidSessionStore.load()?.token },
+            onUnauthorized = {
+                if (authRepository.token() == null &&
+                    kidSessionStore.load() != null
+                ) {
+                    kidRevocation.revoke()
+                }
+            }
+        )
+    }
+
+    /** A revoked kid phone: wipe its keys, kid session and chat database, back to pairing. */
+    val kidRevocation: ro.zapakid.app.keys.KidRevocation by lazy {
+        ro.zapakid.app.keys.KidRevocation(
+            accountKeys,
+            kidId = { kidSessionStore.load()?.kid?.id },
+            clearSession = { kidSessionStore.clear() },
+            files = listOf(app.getDatabasePath("chat.db"), File(app.noBackupFilesDir, "chat-db.key"))
+        )
+    }
+
+    private val kidRegistration: DeviceRegistrar by lazy {
+        ro.zapakid.app.keys.KidDeviceRegistration(
+            accountKeys,
+            HttpDeviceApi(BuildConfig.API_BASE_URL.toHttpUrl(), http, integrity),
+            session = { kidSessionStore.load() },
+            onRevoked = { kidRevocation.revoke() }
+        )
+    }
+
+    /** Sealers for whoever uses this phone: a paired kid, or the signed-in parent. */
+    private val sealerSource: ro.zapakid.app.shell.SealerSource by lazy {
+        val bundles =
+            ro.zapakid.app.keys.HttpPreKeyBundles(BuildConfig.API_BASE_URL.toHttpUrl(), http) {
+                authRepository.token() ?: kidSessionStore.load()?.token
+            }
+        val parent = ro.zapakid.app.keys.LibsignalSealerSource(deviceRegistration, accountKeys, {
+            authRepository.currentSession()?.parent?.id
+        }, bundles)
+        val kid = ro.zapakid.app.keys.LibsignalSealerSource(kidRegistration, accountKeys, {
+            kidSessionStore.load()?.kid?.id
+        }, bundles)
+        object : ro.zapakid.app.shell.SealerSource {
+            override suspend fun sealers() = if (kidSessionStore.load() != null) kid.sealers() else parent.sealers()
+        }
     }
 
     val callLog: ro.zapakid.calls.CallLog by lazy { ro.zapakid.calls.InMemoryCallLog() }
@@ -118,17 +163,7 @@ class AppGraph(
             chatUrl = BuildConfig.CHAT_BASE_URL.toHttpUrl(),
             callsUrl = BuildConfig.CALLS_BASE_URL.toHttpUrl(),
             tokens = chatTokens,
-            sealers =
-                ro.zapakid.app.keys.LibsignalSealerSource(
-                    deviceRegistration,
-                    accountKeys,
-                    authRepository::currentSession,
-                    ro.zapakid.app.keys.HttpPreKeyBundles(
-                        BuildConfig.API_BASE_URL.toHttpUrl(),
-                        http,
-                        authRepository::token
-                    )
-                ),
+            sealers = sealerSource,
             store = {
                 ro.zapakid.chat.data.SqlCipherChatStore(
                     app,
