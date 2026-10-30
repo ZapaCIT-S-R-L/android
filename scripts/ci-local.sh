@@ -22,6 +22,10 @@ for x in glob.glob("*/build/test-results/testDebugUnitTest/*.xml"):
     t += int(m[1]); f += int(m[2]) + int(m[3])
 print(f"unit tests: {t} run, {f} failed")
 PY
+echo "== Contract (api's openapi.yaml at contract/api-commit)"
+npm ci --ignore-scripts --no-audit --no-fund >/dev/null
+./scripts/fetch-openapi.sh
+npm run -s contract
 
 if [ "${SKIP_UI:-}" = 1 ]; then
   echo "== Emulator UI tests: SKIPPED (SKIP_UI=1); say so in the PR, CI's ui job runs them"

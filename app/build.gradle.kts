@@ -109,6 +109,14 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Contract test: the JVM tests record their HTTP exchanges here; scripts/contract-check.js checks them against the
+// API's openapi.yaml (pinned in contract/api-commit).
+tasks.withType<Test>().configureEach {
+    val exchanges = layout.buildDirectory.file("contract/exchanges.jsonl")
+    systemProperty("contract.out", exchanges.get().asFile.path)
+    doFirst { exchanges.get().asFile.delete() }
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
