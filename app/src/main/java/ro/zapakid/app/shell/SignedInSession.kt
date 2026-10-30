@@ -13,8 +13,10 @@ import ro.zapakid.chat.data.ChatStore
  * composition but not the session, so a rotation neither hangs up nor orphans the call's media, and a later sign-out
  * still finds the resources it has to release.
  *
- * [generation] guards the build: a sign-out that lands mid-build releases what was built instead of publishing it,
- * and a new sign-in waits for the outgoing teardown, so a replacement can never race it.
+ * [generation] guards the build: a sign-out that lands mid-build releases what was built instead of publishing it.
+ * A sign-in that arrives while that stale build is still suspended is queued rather than dropped, and the loop
+ * builds it once the stale session has been released — one build at a time, because two would race for the
+ * account's store.
  */
 class SignedInSession<S : OwnedSession>(
     private val scope: CoroutineScope,
@@ -25,23 +27,49 @@ class SignedInSession<S : OwnedSession>(
     val services: StateFlow<S?> = state
 
     private var building: Job? = null
+
+    @Volatile
     private var generation = 0
+
+    @Volatile
+    private var buildingGeneration = -1
+
+    @Volatile
+    private var queued = false
 
     /** Builds the session once; every later call — a rotation, a recomposition — reuses what is there. */
     fun start() {
-        if (state.value != null || building?.isActive == true) return
-        val started = generation
+        if (state.value != null) return
+        if (building?.isActive == true) {
+            // A build of the current generation is already on its way. One belonging to an account that has since
+            // signed out is stale: queue this sign-in instead of starting a second build beside it.
+            if (buildingGeneration != generation) queued = true
+            return
+        }
+        begin(generation)
+    }
+
+    private fun begin(started: Int) {
+        buildingGeneration = started
+        queued = false
         building =
             scope.launch {
-                shutdown.awaitPending()
-                val built = runCatching { build() }.getOrNull() ?: return@launch
-                if (started != generation) {
-                    // Signed out while this was building: give it up rather than publish it to a screen that is gone.
-                    shutdown.releaseOrphan(built)
-                    return@launch
+                var attempt = started
+                while (true) {
+                    shutdown.awaitPending()
+                    val built = runCatching { build() }.getOrNull() ?: return@launch
+                    if (attempt == generation) {
+                        shutdown.attach(built)
+                        state.value = built
+                        return@launch
+                    }
+                    // Signed out while this was building: give it up, then build for whoever asked meanwhile.
+                    shutdown.releaseOrphan(built).join()
+                    if (!queued) return@launch
+                    attempt = generation
+                    buildingGeneration = attempt
+                    queued = false
                 }
-                shutdown.attach(built)
-                state.value = built
             }
     }
 

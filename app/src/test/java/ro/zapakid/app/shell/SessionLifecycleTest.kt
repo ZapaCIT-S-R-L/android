@@ -187,6 +187,45 @@ class SessionLifecycleTest {
         assertNull("nothing is published for an account that is gone", sessions.session.services.value)
         assertEquals(listOf("call released acc-a", "sync stopped acc-a", "store closed acc-a"), events)
     }
+
+    @Test
+    fun aSignInDuringASuspendedBuildIsQueuedAndPublishedExactlyOnce() = runTest {
+        buildGate = CompletableDeferred()
+        harness(this)
+        sessions.session.start()
+        advanceUntilIdle()
+        assertEquals("A's build is suspended on the gate", 1, builds)
+
+        sessions.signedOut()
+        advanceUntilIdle()
+        account = "acc-b"
+        sessions.session.start()
+        advanceUntilIdle()
+
+        assertEquals("one build at a time, so B is queued rather than started beside A", 1, builds)
+        assertNull(sessions.session.services.value)
+
+        buildGate?.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("A's stale build was given up and B's built in its place", 2, builds)
+        assertEquals("acc-b", sessions.session.services.value?.account)
+        assertEquals(
+            "A's media, sync and store all stopped before B was built",
+            listOf("call released acc-a", "sync stopped acc-a", "store closed acc-a"),
+            events
+        )
+        assertEquals(listOf("acc-a", "acc-b"), opened)
+        assertEquals("B's store was left open", listOf("acc-a"), closed)
+
+        sessions.session.start()
+        advanceUntilIdle()
+        assertEquals("and B is published once, not rebuilt", 2, builds)
+
+        // B's sync is still running; the test scope must not be left with unfinished work.
+        sessions.signedOut()
+        advanceUntilIdle()
+    }
 }
 
 /** A signed-in session with a fake call and a fake sync: the store, the log and the shutdown are the real ones. */
