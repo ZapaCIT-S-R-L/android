@@ -5,9 +5,13 @@
 #   PLAY_UPLOAD_KEYSTORE_PASSWORD its password
 #   PLAY_UPLOAD_KEY_ALIAS         the key alias
 #   PLAY_UPLOAD_KEY_PASSWORD      the key password (PKCS12: the same as the keystore password)
-#   PLAY_SERVICE_ACCOUNT_JSON     the publishing service account key (Play Console: release to testing tracks only)
-# Without the keystore secrets the job skips with a notice. With the keystore but no service account it builds the
-# signed AAB and keeps it as a workflow artifact (the first upload of a new app goes through Play Console by hand).
+# Publishing is keyless (Workload Identity Federation): GitHub's OIDC token for this job (repository, environment play,
+# branch main) is exchanged for a short-lived token of the publishing service account. Environment variables (not
+# secrets, nothing secret in them):
+#   PLAY_WIF_PROVIDER     projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   PLAY_SERVICE_ACCOUNT  the publishing service account (Play Console: release to testing tracks, this app only)
+# Without the keystore secrets the job skips with a notice. With the keystore but no publisher it builds the signed
+# AAB and keeps it as a workflow artifact (the first upload of a new app goes through Play Console by hand).
 name: play-internal
 
 on:
@@ -29,19 +33,22 @@ concurrency:
 jobs:
   upload:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation, this job only
     timeout-minutes: 45
     environment:
       name: play
     env:
       HAS_KEYSTORE: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 != '' }}
-      HAS_PUBLISHER: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      HAS_PUBLISHER: ${{ vars.PLAY_WIF_PROVIDER != '' && vars.PLAY_SERVICE_ACCOUNT != '' }}
     steps:
       - name: Check the secrets
         run: |
           if [ "$HAS_KEYSTORE" != true ]; then
             echo "::notice::Play upload skipped: the play environment has no upload keystore secrets yet (see the PR that added this workflow)."
           elif [ "$HAS_PUBLISHER" != true ]; then
-            echo "::notice::No Play service account yet: building the signed AAB as an artifact only; upload skipped."
+            echo "::notice::No Play publisher (PLAY_WIF_PROVIDER, PLAY_SERVICE_ACCOUNT) yet: building the signed AAB as an artifact only; upload skipped."
           fi
       - if: env.HAS_KEYSTORE == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,7 +96,8 @@ jobs:
         id: google
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          credentials_json: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          workload_identity_provider: ${{ vars.PLAY_WIF_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
           create_credentials_file: false
           export_environment_variables: false
           token_format: access_token

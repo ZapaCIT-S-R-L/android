@@ -22,7 +22,10 @@ test("the Play upload runs only in the protected play environment, by hand, and 
   assert.doesNotMatch(play, /pull_request/);
   assert.match(play, /environment:\s*\n\s*name: play/);
   assert.match(play, /secrets\.PLAY_UPLOAD_KEYSTORE_BASE64/);
-  assert.match(play, /secrets\.PLAY_SERVICE_ACCOUNT_JSON/);
+  // Keyless publishing: Workload Identity Federation, no service account key anywhere.
+  assert.match(play, /workload_identity_provider: \$\{\{ vars\.PLAY_WIF_PROVIDER \}\}/);
+  assert.match(play, /service_account: \$\{\{ vars\.PLAY_SERVICE_ACCOUNT \}\}/);
+  assert.doesNotMatch(play, /credentials_json|PLAY_SERVICE_ACCOUNT_JSON/);
   assert.match(play, /::notice::.*skipped/i);
 });
 
@@ -30,5 +33,12 @@ test("no other workflow can see the Play secrets", () => {
   for (const [file, text] of Object.entries(workflows)) {
     if (file === "play-internal.yml") continue;
     assert.doesNotMatch(text, /PLAY_(UPLOAD|SERVICE)/, file);
+  }
+});
+
+test("only the Play job may request a GitHub OIDC token", () => {
+  for (const [file, text] of Object.entries(workflows)) {
+    if (file === "play-internal.yml") assert.match(text, /id-token: write/, file);
+    else assert.doesNotMatch(text, /id-token: write/, file);
   }
 });
