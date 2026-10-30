@@ -25,18 +25,20 @@ class MainActivity : ComponentActivity() {
         viewModelFactory { initializer { AuthViewModel(graph.authRepository, graph::signedOut) } }
     }
 
+    private val deviceSetup: DeviceSetupViewModel by viewModels {
+        viewModelFactory { initializer { DeviceSetupViewModel(graph.deviceRegistration) } }
+    }
+
     private val familyViewModel: FamilyViewModel by viewModels {
         viewModelFactory { initializer { FamilyViewModel(graph.familyApi, graph.authRepository::token) } }
     }
 
     private val kidViewModel: KidPairingViewModel by viewModels {
         viewModelFactory {
-            initializer { KidPairingViewModel(graph.familyApi, graph.kidSessionStore, GmsQrScanner(application)) }
+            initializer {
+                KidPairingViewModel(graph.familyApi, graph.kidSessionStore, scanner = GmsQrScanner(application))
+            }
         }
-    }
-
-    private val deviceSetup: DeviceSetupViewModel by viewModels {
-        viewModelFactory { initializer { DeviceSetupViewModel(graph.deviceRegistration) } }
     }
 
     private val google by lazy { GoogleIdTokenProvider({ this }, BuildConfig.GOOGLE_SERVER_CLIENT_ID) }

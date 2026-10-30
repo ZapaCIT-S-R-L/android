@@ -48,9 +48,13 @@ class SignInFlowTest {
     private val google = FakeIdTokenProvider()
     private val apple = FakeAppleBrowser()
 
-    /** Stands in for device registration: answers [deviceResults] in order. */
+    /** Stands in for device registration: answers [deviceResults] in order, and counts how often it was asked. */
     private val deviceResults = ArrayDeque(listOf<DeviceRegistration.Result>(DeviceRegistration.Result.Registered(2)))
-    private val registrar = DeviceRegistrar { deviceResults.removeFirst() }
+    private var registrations = 0
+    private val registrar = DeviceRegistrar {
+        registrations++
+        deviceResults.removeFirst()
+    }
 
     private fun launch(fontScale: Float = 1f) {
         val viewModel = AuthViewModel(AuthRepository(api, store, ages, APPLE_CONFIG))
@@ -208,5 +212,26 @@ class SignInFlowTest {
         compose.onNodeWithText("Try again").assertHeightIsAtLeast(48.dp).performClick()
         compose.waitForIdle()
         compose.onNodeWithText("End-to-end encryption is set up on this phone.").assertIsDisplayed()
+    }
+
+    @Test
+    fun signingOutLetsTheSameParentRegisterThisPhoneAgain() {
+        deviceResults.clear()
+        deviceResults += DeviceRegistration.Result.Registered(2)
+        deviceResults += DeviceRegistration.Result.Registered(3)
+        launch()
+
+        signInWithGoogle()
+        compose.onNodeWithText("End-to-end encryption is set up on this phone.").assertIsDisplayed()
+        assertEquals("one session, one registration", 1, registrations)
+
+        compose.onNodeWithContentDescription("Sign out").performClick()
+        compose.waitForIdle()
+        signInWithGoogle()
+
+        // The same parent, a new session: the server bound the previous device to the session that just went, so
+        // this phone has to register again rather than keep showing the old session's Ready.
+        compose.onNodeWithText("End-to-end encryption is set up on this phone.").assertIsDisplayed()
+        assertEquals("a new session registers this phone again", 2, registrations)
     }
 }

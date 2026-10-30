@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import java.io.File
 import java.io.IOException
 import java.security.GeneralSecurityException
+import java.time.Instant
+import java.time.format.DateTimeParseException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,15 +92,58 @@ sealed interface KidPairingState {
     data class Failed(val error: FamilyError) : KidPairingState
 }
 
-/** The kid's phone: scan the parent's QR, redeem it, keep the kid session. */
+/**
+ * The kid's phone: scan the parent's QR, redeem it, keep the kid session.
+ *
+ * A stored session is only restored while it has not expired. A definitive auth failure (401: revoked or expired
+ * on the server) clears the store and returns to pairing; network errors and 5xx keep the pairing. Kid-authenticated
+ * calls go through [withSession] so they all follow that rule.
+ */
 class KidPairingViewModel(
     private val api: FamilyApi,
     private val store: KidSessionStore,
+    private val now: () -> Instant = Instant::now,
     private val scanner: QrScanner
 ) : ViewModel() {
-    private val mutableState =
-        MutableStateFlow<KidPairingState>(store.load()?.let { KidPairingState.Paired(it) } ?: KidPairingState.Waiting)
+    private val mutableState = MutableStateFlow<KidPairingState>(restore())
     val state: StateFlow<KidPairingState> = mutableState
+
+    private fun restore(): KidPairingState {
+        val session = store.load()
+        if (session != null && isExpired(session)) store.clear()
+        return session?.takeUnless { isExpired(it) }?.let { KidPairingState.Paired(it) } ?: KidPairingState.Waiting
+    }
+
+    /** An unreadable expiry counts as expired: fail closed and pair again. */
+    @Suppress("SwallowedException")
+    private fun isExpired(session: KidSession): Boolean = try {
+        !Instant.parse(session.expiresAt).isAfter(now())
+    } catch (e: DateTimeParseException) {
+        true
+    }
+
+    /**
+     * Runs a kid-authenticated call with the stored session. An expired session, or a 401 from the server, clears
+     * the stored session and returns to pairing (the error is rethrown); any other failure leaves the pairing alone.
+     */
+    suspend fun <T> withSession(block: suspend (KidSession) -> T): T {
+        val session = (mutableState.value as? KidPairingState.Paired)?.session
+        if (session == null || isExpired(session)) {
+            reset()
+            throw FamilyApiException(UNAUTHORIZED, "no_valid_session", "not paired or kid session expired")
+        }
+        try {
+            return block(session)
+        } catch (e: FamilyApiException) {
+            if (e.status == UNAUTHORIZED) reset()
+            throw e
+        }
+    }
+
+    private fun reset() {
+        store.clear()
+        mutableState.value = KidPairingState.Waiting
+    }
 
     fun scan() {
         if (mutableState.value == KidPairingState.Pairing) return
@@ -136,7 +181,12 @@ class KidPairingViewModel(
             }
     }
 
+    /** Only leaves a failed pairing; a working session is never dropped from here. */
     fun tryAgain() {
-        mutableState.value = KidPairingState.Waiting
+        if (mutableState.value is KidPairingState.Failed) mutableState.value = KidPairingState.Waiting
+    }
+
+    private companion object {
+        const val UNAUTHORIZED = 401
     }
 }

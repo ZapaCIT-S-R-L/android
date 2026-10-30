@@ -78,6 +78,25 @@ class DeviceSetupViewModelTest {
         assertEquals(DeviceSetupState.Ready, vm.state.value)
     }
 
+    // Review of #13 (2026-10-28), P1: a new session is a new device on the server, so the setup runs again.
+    @Test
+    fun afterASignOutTheSameAccountSetsUpAgain() = runTest {
+        val registrar =
+            FakeRegistrar(
+                ArrayDeque(listOf(DeviceRegistration.Result.Registered(2), DeviceRegistration.Result.Registered(3)))
+            )
+        val vm = DeviceSetupViewModel(registrar)
+        vm.start("account-a")
+        assertEquals(DeviceSetupState.Ready, vm.state.value)
+
+        vm.reset()
+        assertEquals(DeviceSetupState.Idle, vm.state.value)
+
+        vm.start("account-a")
+        assertEquals(2, registrar.calls)
+        assertEquals(DeviceSetupState.Ready, vm.state.value)
+    }
+
     @Test
     fun anotherAccountSetsUpAgain() = runTest {
         val registrar =
