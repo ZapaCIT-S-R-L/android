@@ -2,9 +2,9 @@ package ro.zapakid.chat
 
 import java.util.Base64
 import java.util.UUID
+import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.serialization.json.Json
 import ro.zapakid.chat.crypto.AttachmentCipher
 import ro.zapakid.chat.crypto.CiphertextType
 import ro.zapakid.chat.crypto.MessageSealer
@@ -35,9 +35,10 @@ class ChatRepository(
     private val self: ChatDevice,
     private val people: ChatPeople = ChatPeople { it },
     private val clock: () -> Long = System::currentTimeMillis,
-    private val newId: () -> String = { UUID.randomUUID().toString() }
+    private val newId: () -> String = { UUID.randomUUID().toString() },
+    /** A fresh call announcement arrived (callId, conversation, caller account): ring, as iOS does. */
+    private val onIncomingCall: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
     private val b64 = Base64.getEncoder()
     private val unb64 = Base64.getDecoder()
 
@@ -77,11 +78,15 @@ class ChatRepository(
         return checkNotNull(store.conversation(id))
     }
 
+    /** Empty or over 4000 characters (the shared cap): not sent. */
     suspend fun sendText(conversationId: String, text: String) {
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
-        send(conversationId, MessageKind.Text, trimmed, null, null)
+        if (!ChatContent.isValidText(text)) return
+        send(conversationId, MessageBody(newId(), MessageKind.Text, text = text.trim(), sentAt = clock()), null)
     }
+
+    /** Tells the others that this phone is calling (sealed like any message; shows as a call in the chat). */
+    suspend fun sendCall(conversationId: String, callId: String) =
+        send(conversationId, MessageBody(newId(), MessageKind.Call, callId = callId, sentAt = clock()), null)
 
     /** Images and voice notes: encrypted on the phone, uploaded as ciphertext; the key travels in the seal. */
     suspend fun sendMedia(
@@ -92,7 +97,7 @@ class ChatRepository(
         durationMillis: Long? = null,
         localFile: String? = null
     ) {
-        require(kind != MessageKind.Text)
+        require(kind == MessageKind.Image || kind == MessageKind.Voice)
         val sealed = AttachmentCipher.encrypt(bytes)
         val upload = api.createAttachment(conversationId, sealed.bytes.size.toLong())
         api.upload(upload.uploadUrl, sealed.bytes)
@@ -101,34 +106,28 @@ class ChatRepository(
                 upload.attachmentId,
                 b64.encodeToString(sealed.key),
                 b64.encodeToString(sealed.sha256),
+                sealed.bytes.size.toLong(),
                 mime,
-                bytes.size.toLong(),
-                durationMillis
+                durationMillis?.let { it / MILLIS_PER_SECOND }
             )
         sealed.key.fill(0)
-        send(conversationId, kind, null, ref, localFile)
+        send(conversationId, MessageBody(newId(), kind, attachment = ref, sentAt = clock()), localFile)
     }
 
-    private suspend fun send(
-        conversationId: String,
-        kind: MessageKind,
-        text: String?,
-        attachment: AttachmentRef?,
-        localFile: String?
-    ) {
-        val body = MessageBody(newId(), kind, text, attachment, clock())
+    private suspend fun send(conversationId: String, body: MessageBody, localFile: String?) {
         store.add(
             Message(
                 body.id,
                 conversationId,
                 self.account,
                 true,
-                kind,
-                text,
-                attachment,
+                body.kind,
+                body.text,
+                body.attachment,
                 body.sentAt,
                 MessageStatus.Sending,
-                localFile
+                localFile,
+                body.callId
             )
         )
         deliver(conversationId, body)
@@ -138,15 +137,12 @@ class ChatRepository(
     suspend fun retry(message: Message) {
         if (!message.mine || message.status != MessageStatus.Failed) return
         store.setStatus(message.id, MessageStatus.Sending)
-        deliver(
-            message.conversationId,
-            MessageBody(message.id, message.kind, message.text, message.attachment, message.sentAt)
-        )
+        deliver(message.conversationId, message.body)
     }
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // any failure marks the message Failed (retry)
     private suspend fun deliver(conversationId: String, body: MessageBody) {
-        val plain = json.encodeToString(MessageBody.serializer(), body).encodeToByteArray()
+        val plain = ChatContent.encode(body)
         try {
             try {
                 api.send(conversationId, body.id, seal(conversationId, plain))
@@ -180,7 +176,11 @@ class ChatRepository(
         }
     }
 
-    /** Opens and stores one envelope; false when it can't be opened or was already stored (ack it anyway). */
+    /**
+     * Opens and stores one envelope; false when it can't be opened, is relabelled or was already stored. Every
+     * envelope is acknowledged afterwards (a libsignal session can't open it a second time anyway): content this
+     * app can't read (a newer format) is kept as an [MessageKind.Unsupported] placeholder, not dropped.
+     */
     @Suppress("ReturnCount", "SwallowedException") // unopenable envelopes are dropped, not errors
     suspend fun receive(envelope: WireEnvelope): Boolean {
         val from = ChatDevice(envelope.senderAccountId, envelope.senderDeviceId)
@@ -193,24 +193,32 @@ class ChatRepository(
             } catch (e: IllegalArgumentException) {
                 return false
             }
-        val body = runCatching { json.decodeFromString(MessageBody.serializer(), plain.decodeToString()) }.getOrNull()
+        val body =
+            ChatContent.decode(plain)
+                ?: MessageBody(envelope.messageId, MessageKind.Unsupported, sentAt = envelope.serverTimestamp)
         plain.fill(0)
         // The message id is inside the seal: the server can't relabel or replay one message as another.
-        if (body == null || body.id != envelope.messageId) return false
+        if (body.id != envelope.messageId) return false
         if (store.conversation(envelope.conversationId) == null) remember(api.conversation(envelope.conversationId))
-        return store.add(
-            Message(
-                body.id,
-                envelope.conversationId,
-                from.account,
-                from.account == self.account,
-                body.kind,
-                body.text,
-                body.attachment,
-                body.sentAt,
-                MessageStatus.Received
+        val added =
+            store.add(
+                Message(
+                    body.id,
+                    envelope.conversationId,
+                    from.account,
+                    from.account == self.account,
+                    body.kind,
+                    body.text,
+                    body.attachment,
+                    body.sentAt,
+                    MessageStatus.Received,
+                    callId = body.callId
+                )
             )
-        )
+        if (added && body.kind == MessageKind.Call && abs(clock() - body.sentAt) < CALL_WINDOW_MILLIS) {
+            onIncomingCall(checkNotNull(body.callId), envelope.conversationId, from.account)
+        }
+        return added
     }
 
     /** Envelopes queued while this phone was away: open, store, then acknowledge them page by page. */
@@ -224,7 +232,7 @@ class ChatRepository(
 
     /** Downloads, checks and decrypts an attachment. */
     suspend fun openAttachment(ref: AttachmentRef): ByteArray =
-        AttachmentCipher.decrypt(api.download(ref.id), unb64.decode(ref.key), unb64.decode(ref.sha256))
+        AttachmentCipher.decrypt(api.download(ref.id), unb64.decode(ref.key), unb64.decode(ref.digest))
 
     suspend fun markRead(conversationId: String) = store.markRead(conversationId)
 
@@ -237,5 +245,7 @@ class ChatRepository(
         const val AVATARS = 8
         const val CONFLICT = 409
         const val GONE = 410
+        const val MILLIS_PER_SECOND = 1000.0
+        const val CALL_WINDOW_MILLIS = 60_000L
     }
 }

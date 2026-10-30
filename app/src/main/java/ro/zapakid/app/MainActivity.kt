@@ -30,7 +30,9 @@ class MainActivity : ComponentActivity() {
 
     private val kidViewModel: KidPairingViewModel by viewModels {
         viewModelFactory {
-            initializer { KidPairingViewModel(graph.familyApi, graph.kidSessionStore, GmsQrScanner(application)) }
+            initializer {
+                KidPairingViewModel(graph.familyApi, graph.kidSessionStore, scanner = GmsQrScanner(application))
+            }
         }
     }
 

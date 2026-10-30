@@ -19,4 +19,6 @@
     <string name="chat_voice_note">Mesaj vocal, %1$d s. Ascultă</string>
     <string name="chat_sending">Se trimite…</string>
     <string name="chat_failed">Netrimis. Apasă ca să încerci din nou</string>
+    <string name="chat_call_message">Apel</string>
+    <string name="chat_unsupported">Mesajul acesta are nevoie de un ZapaKid mai nou. Te rugăm să actualizezi aplicația.</string>
 </resources>

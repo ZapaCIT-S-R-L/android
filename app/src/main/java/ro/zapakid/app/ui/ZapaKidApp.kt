@@ -36,6 +36,9 @@ fun ZapaKidApp(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var kidMode by rememberSaveable { mutableStateOf(false) }
     val kidState = kid?.state?.collectAsStateWithLifecycle()?.value
+    // A paired phone is a kid phone: stay on the kid's screen even when the session is revoked, so it shows pairing.
+    LaunchedEffect(kidState is KidPairingState.Paired) { if (kidState is KidPairingState.Paired) kidMode = true }
+    // Paired and the shell is wired: the kid's phone goes straight to its own chats and calls.
     if (shell != null && kidState is KidPairingState.Paired) {
         ro.zapakid.app.shell.ShellRoot(shell, kid = true, family = {})
         return

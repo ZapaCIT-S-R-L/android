@@ -1,5 +1,7 @@
 package ro.zapakid.app.family
 
+import java.io.IOException
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -135,12 +137,109 @@ class FamilyViewModelTest {
         assertTrue(api.calls.none { it.startsWith("redeem") })
     }
 
+    private suspend inline fun <reified T : Throwable> assertFailsWith(block: () -> Unit): T = try {
+        block()
+        throw AssertionError("expected ${T::class.simpleName}")
+    } catch (e: Throwable) {
+        if (e is T) e else throw e
+    }
+
+    private val clock = { Instant.parse("2026-10-30T12:00:00Z") }
+
+    private fun session(expiresAt: String) =
+        KidSession("zkk", expiresAt, Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1"))
+
+    private fun pairedVm(store: MemoryKidStore) = KidPairingViewModel(api, store, now = clock) { null }
+
     @Test
     fun aPairedPhoneStartsPaired() {
-        val store = MemoryKidStore().apply {
-            save(KidSession("zkk", "x", Kid("k1", "Mia", "robot-3", 2), FamilyRef("f1")))
+        val store = MemoryKidStore().apply { save(session("2026-10-31T00:00:00Z")) }
+
+        assertTrue(pairedVm(store).state.value is KidPairingState.Paired)
+        assertTrue(store.session != null)
+    }
+
+    @Test
+    fun anExpiredSessionIsDroppedOnRestoreAndThePhonePairsAgain() {
+        val store = MemoryKidStore().apply { save(session("2026-10-30T11:59:59Z")) }
+
+        assertEquals(KidPairingState.Waiting, pairedVm(store).state.value)
+        assertNull(store.session)
+    }
+
+    @Test
+    fun anExpiryExactlyNowCountsAsExpired() {
+        val store = MemoryKidStore().apply { save(session("2026-10-30T12:00:00Z")) }
+
+        assertEquals(KidPairingState.Waiting, pairedVm(store).state.value)
+        assertNull(store.session)
+    }
+
+    @Test
+    fun anUnreadableExpiryFailsClosed() {
+        val store = MemoryKidStore().apply { save(session("x")) }
+
+        assertEquals(KidPairingState.Waiting, pairedVm(store).state.value)
+        assertNull(store.session)
+    }
+
+    @Test
+    fun aRevokedSessionIs401ClearsTheStoreAndReturnsToPairing() = runTest {
+        val store = MemoryKidStore().apply { save(session("2026-10-31T00:00:00Z")) }
+        val vm = pairedVm(store)
+
+        val error = assertFailsWith<FamilyApiException> {
+            vm.withSession { throw FamilyApiException(401, "unauthorized", "revoked") }
         }
 
-        assertTrue(KidPairingViewModel(api, store) { null }.state.value is KidPairingState.Paired)
+        assertEquals(401, error.status)
+        assertEquals(KidPairingState.Waiting, vm.state.value)
+        assertNull(store.session)
+    }
+
+    @Test
+    fun transientFailuresKeepThePairing() = runTest {
+        val store = MemoryKidStore().apply { save(session("2026-10-31T00:00:00Z")) }
+        val vm = pairedVm(store)
+
+        assertFailsWith<IOException> { vm.withSession { throw IOException("offline") } }
+        assertFailsWith<FamilyApiException> { vm.withSession { throw FamilyApiException(503, "down", "5xx") } }
+        assertFailsWith<FamilyApiException> { vm.withSession { throw FamilyApiException(429, "slow", "429") } }
+
+        assertTrue(vm.state.value is KidPairingState.Paired)
+        assertTrue(store.session != null)
+    }
+
+    @Test
+    fun aSessionThatExpiredWhileRunningIsDroppedBeforeTheCall() = runTest {
+        val store = MemoryKidStore().apply { save(session("2026-10-30T12:30:00Z")) }
+        var now = Instant.parse("2026-10-30T12:00:00Z")
+        val vm = KidPairingViewModel(api, store, now = { now }) { null }
+        now = Instant.parse("2026-10-30T13:00:00Z")
+        var called = false
+
+        assertFailsWith<FamilyApiException> { vm.withSession { called = true } }
+
+        assertTrue(!called)
+        assertEquals(KidPairingState.Waiting, vm.state.value)
+        assertNull(store.session)
+    }
+
+    @Test
+    fun withSessionHandsTheStoredSessionToTheCall() = runTest {
+        val store = MemoryKidStore().apply { save(session("2026-10-31T00:00:00Z")) }
+
+        assertEquals("zkk", pairedVm(store).withSession { it.token })
+    }
+
+    @Test
+    fun tryAgainNeverDropsAWorkingSession() {
+        val store = MemoryKidStore().apply { save(session("2026-10-31T00:00:00Z")) }
+        val vm = pairedVm(store)
+
+        vm.tryAgain()
+
+        assertTrue(vm.state.value is KidPairingState.Paired)
+        assertTrue(store.session != null)
     }
 }
