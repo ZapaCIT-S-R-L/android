@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="family_title">Meine Familie</string>
+    <string name="family_parents">Eltern</string>
+    <string name="family_parent">Elternteil</string>
+    <string name="family_invite_parent">Den anderen Elternteil einladen</string>
+    <string name="family_kids">Kinder</string>
+    <string name="family_no_kids">Noch keine Kinder. Füge dein erstes Kind hinzu!</string>
+    <string name="family_add_kid">Kind hinzufügen</string>
+    <string name="family_save_kid">Hinzufügen</string>
+    <string name="family_cancel">Abbrechen</string>
+    <string name="family_done">Fertig</string>
+    <string name="family_nickname">Spitzname</string>
+    <string name="family_nickname_hint">Nur ein Spitzname, kein echter Name nötig.</string>
+    <string name="family_pick_robot">Wähle einen Roboter</string>
+    <string name="family_robot_n">Roboter %1$d</string>
+    <string name="family_grade">Klasse</string>
+    <string name="family_pair_phone">Handy koppeln</string>
+    <string name="family_pair_title">Handy von %1$s koppeln</string>
+    <string name="family_pair_body">Öffne ZapaKid auf dem Handy deines Kindes, tippe auf „Das ist ein Kinderhandy“ und scanne diesen Code. Er funktioniert einmal, 5 Minuten lang.</string>
+    <string name="family_invite_title">Den anderen Elternteil einladen</string>
+    <string name="family_invite_body">Der andere Elternteil meldet sich bei ZapaKid an und scannt diesen Code. Er funktioniert einmal, 3 Tage lang.</string>
+    <string name="family_error_network">Keine Verbindung. Prüfe das Internet und versuche es nochmal.</string>
+    <string name="family_error_too_many">Zu viele offene Codes. Warte, bis einer benutzt wird oder abläuft.</string>
+    <string name="family_error_invalid_code">Dieser Code funktioniert nicht mehr. Frag nach einem neuen.</string>
+    <string name="family_error_already">Du hast schon eine Familie mit Kindern oder einem anderen Elternteil.</string>
+    <string name="family_error_too_many_kids">Eine Familie kann bis zu 12 Kinder haben.</string>
+    <string name="family_error_server">Etwas ist schiefgelaufen. Versuch es gleich nochmal.</string>
+    <string name="grade_not_set">Keine Klasse</string>
+    <string name="grade_kindergarten">Kindergarten</string>
+    <string name="grade_preparatory">Vorschule</string>
+    <string name="grade_n">%1$d. Klasse</string>
+    <string name="kid_phone">Das ist ein Kinderhandy</string>
+    <string name="kid_pair_title">Hallo! Verbinden wir dein Handy</string>
+    <string name="kid_pair_body">Bitte Mama oder Papa, dir den QR-Code in ZapaKid zu zeigen, und tippe dann auf den Knopf.</string>
+    <string name="kid_pair_scan">Code scannen</string>
+    <string name="kid_pair_working">Wird verbunden…</string>
+    <string name="kid_pair_done">Dein Handy ist mit deiner Familie verbunden!</string>
+    <string name="kid_pair_hello">Hallo %1$s!</string>
+    <string name="kid_pair_try_again">Nochmal versuchen</string>
+    <string name="kid_pair_back">Zurück</string>
+</resources>

@@ -10,6 +10,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import ro.zapakid.app.auth.signin.CustomTabAppleBrowser
 import ro.zapakid.app.auth.signin.GoogleIdTokenProvider
+import ro.zapakid.app.family.FamilyViewModel
+import ro.zapakid.app.family.GmsQrScanner
+import ro.zapakid.app.family.KidPairingViewModel
 import ro.zapakid.app.ui.AuthViewModel
 import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp
@@ -26,6 +29,18 @@ class MainActivity : ComponentActivity() {
         viewModelFactory { initializer { DeviceSetupViewModel(graph.deviceRegistration) } }
     }
 
+    private val familyViewModel: FamilyViewModel by viewModels {
+        viewModelFactory { initializer { FamilyViewModel(graph.familyApi, graph.authRepository::token) } }
+    }
+
+    private val kidViewModel: KidPairingViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                KidPairingViewModel(graph.familyApi, graph.kidSessionStore, scanner = GmsQrScanner(application))
+            }
+        }
+    }
+
     private val google by lazy { GoogleIdTokenProvider({ this }, BuildConfig.GOOGLE_SERVER_CLIENT_ID) }
     private val apple by lazy { CustomTabAppleBrowser(activity = { this }, openCustomTab = graph.openCustomTab) }
 
@@ -33,7 +48,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ZapaKidTheme { ZapaKidApp(authViewModel, deviceSetup, google = google, apple = apple) }
+            ZapaKidTheme {
+                ZapaKidApp(
+                    authViewModel,
+                    deviceSetup,
+                    google = google,
+                    apple = apple,
+                    family = familyViewModel,
+                    kid = kidViewModel
+                )
+            }
         }
     }
 

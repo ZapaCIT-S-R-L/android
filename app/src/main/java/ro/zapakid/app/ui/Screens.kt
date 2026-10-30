@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +71,8 @@ fun SignInScreen(
     error: SignInError?,
     retryAfterSeconds: Long?,
     onGoogle: () -> Unit,
-    onApple: () -> Unit
+    onApple: () -> Unit,
+    onKidPhone: () -> Unit = {}
 ) {
     ScreenColumn(tag = "sign-in") {
         Title(stringResource(R.string.app_name))
@@ -99,6 +101,10 @@ fun SignInScreen(
                     .heightIn(min = MinTouchTarget)
                     .semantics { contentDescription = appleLabel }
         ) { Text(appleLabel) }
+
+        TextButton(onClick = onKidPhone, modifier = Modifier.heightIn(min = MinTouchTarget).testTag("kid-phone")) {
+            Text(stringResource(R.string.kid_phone))
+        }
 
         if (busy) {
             val signingIn = stringResource(R.string.signing_in)

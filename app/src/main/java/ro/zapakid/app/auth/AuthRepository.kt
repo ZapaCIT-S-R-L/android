@@ -48,6 +48,9 @@ class AuthRepository(
     /** The parent of a stored, unexpired session, without a network call. */
     fun current(): Parent? = validSession()?.parent
 
+    /** The stored, unexpired session token, for the account API calls (families). Never logged. */
+    fun token(): String? = validSession()?.token
+
     /** The stored, unexpired session (for the API calls after sign-in), without a network call. */
     fun currentSession(): Session? = validSession()
 

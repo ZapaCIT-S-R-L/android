@@ -2,6 +2,7 @@ package ro.zapakid.app.keys
 
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import ro.zapakid.app.auth.AuthApiException
 import ro.zapakid.app.auth.Session
 
@@ -14,11 +15,14 @@ fun interface DeviceRegistrar {
  * Registers this phone: resolve the account's identity (Block Store, or wait for a re-share), make this device's
  * keys once, upload them (POST /v1/devices) and remember the device ID. The public payload is kept until the
  * upload succeeds, so a retry sends the same keys instead of making new ones.
+ *
+ * Everything is keyed by the signed-in account ([AccountKeys]): another parent on the same phone never sees this
+ * one's identity, prekeys or device ID. The device ID is also bound to the session that registered it, as on the
+ * server (`POST /v1/devices` binds the session; a new session has no device). After a sign-out and sign-in the
+ * phone registers again, as a new device with the same account identity and fresh prekeys.
  */
 class DeviceRegistration(
-    private val records: EncryptedRecordStore,
-    /** The Block Store copy for an account ID ([BlockStoreIdentityBackup]); one item per account. */
-    private val backup: (accountId: String) -> IdentityBackup,
+    private val accounts: AccountKeys,
     private val api: DeviceApi,
     private val session: () -> Session?,
     private val reshare: IdentityReshare,
@@ -34,23 +38,33 @@ class DeviceRegistration(
 
     enum class Error { SIGNED_OUT, NETWORK, SERVER, IDENTITY_MISMATCH }
 
+    /** Registers the signed-in account on this phone; without a session nothing is read and nothing is reported. */
     override suspend fun register(): Result {
-        val registered = records.get(KIND, DEVICE_ID)?.let { Result.Registered(ByteBuffer.wrap(it).int) }
-        val current = session()
-        return when {
-            registered != null -> registered
-            current == null -> Result.Failed(Error.SIGNED_OUT)
-            else -> registerWith(current)
+        val current = session() ?: return Result.Failed(Error.SIGNED_OUT)
+        val records = accounts.records(current.parent.id)
+        val bound = records.get(KIND, SESSION)?.contentEquals(sessionHash(current.token)) == true
+        if (!bound) {
+            // Another session registered (or started to): the server doesn't know this one. New device, new keys.
+            records.remove(KIND, DEVICE_ID)
+            records.remove(KIND, PENDING_KEYS)
+            records.remove(KIND, SESSION)
         }
+        return records.get(KIND, DEVICE_ID)?.let { Result.Registered(ByteBuffer.wrap(it).int) }
+            ?: registerWith(current, records)
     }
 
     @Suppress("SwallowedException") // errors become results
-    private suspend fun registerWith(current: Session): Result =
+    private suspend fun registerWith(current: Session, records: EncryptedRecordStore): Result =
         try {
             val registered = api.accountIdentityKey(current.token, current.parent.id)
-            when (val state = LocalIdentity(records, backup(current.parent.id)).resolveVerified(registered, reshare)) {
+            when (
+                val state = LocalIdentity(
+                    records,
+                    accounts.backup(current.parent.id)
+                ).resolveVerified(registered, reshare)
+            ) {
                 LocalIdentity.State.WaitingForReshare -> Result.WaitingForReshare
-                is LocalIdentity.State.Ready -> upload(current.token, state.identity)
+                is LocalIdentity.State.Ready -> upload(current, state.identity, records)
             }
         } catch (e: AuthApiException) {
             Result.Failed(
@@ -64,7 +78,11 @@ class DeviceRegistration(
             Result.Failed(Error.NETWORK)
         }
 
-    private suspend fun upload(token: String, identity: LocalIdentity.Identity): Result {
+    private suspend fun upload(
+        current: Session,
+        identity: LocalIdentity.Identity,
+        records: EncryptedRecordStore
+    ): Result {
         val keys =
             records.get(KIND, PENDING_KEYS)?.let {
                 DeviceKeys.json.decodeFromString(DeviceKeys.serializer(), it.decodeToString())
@@ -75,17 +93,23 @@ class DeviceRegistration(
                         PENDING_KEYS,
                         DeviceKeys.json.encodeToString(DeviceKeys.serializer(), it).encodeToByteArray()
                     )
+                    records.put(KIND, SESSION, sessionHash(current.token))
                 }
-        val deviceId = api.register(token, keys)
+        val deviceId = api.register(current.token, keys)
         records.put(KIND, DEVICE_ID, ByteBuffer.allocate(Int.SIZE_BYTES).putInt(deviceId).array())
         records.remove(KIND, PENDING_KEYS)
         return Result.Registered(deviceId)
     }
 
+    /** Which session the pending keys or device ID belong to; the token itself is never written to the records. */
+    private fun sessionHash(token: String): ByteArray =
+        MessageDigest.getInstance("SHA-256").digest(token.encodeToByteArray())
+
     private companion object {
         const val KIND = "device"
         const val DEVICE_ID = "device-id"
         const val PENDING_KEYS = "pending-device-keys"
+        const val SESSION = "session"
 
         // Not in openapi.yaml yet: the API's answer when the uploaded identity isn't the account's.
         const val IDENTITY_MISMATCH = "identity_mismatch"
