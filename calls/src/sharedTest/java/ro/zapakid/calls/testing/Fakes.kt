@@ -21,6 +21,7 @@ import ro.zapakid.calls.crypto.KeyEnvelope
 import ro.zapakid.calls.crypto.KeyRing
 import ro.zapakid.calls.engine.CallEngine
 import ro.zapakid.calls.engine.EngineEvent
+import ro.zapakid.calls.ring.Ringback
 
 // Ids sort acc-ana.1 < acc-ion.3 < acc-me.2 < acc-mia.4: Ana leads whenever she is in the call.
 val ME = CallDevice("acc-me", "2")
@@ -136,6 +137,25 @@ class FakeCallEngine : CallEngine {
 
     fun emit(event: EngineEvent) {
         flow.tryEmit(event)
+    }
+}
+
+/** The caller's ringback without audio: records the starts and stops the controller asks for. */
+class FakeRingback : Ringback {
+    val events = mutableListOf<String>()
+    var playing = false
+        private set
+
+    override fun start() {
+        if (playing) return
+        playing = true
+        events += "start"
+    }
+
+    override fun stop() {
+        if (!playing) return
+        playing = false
+        events += "stop"
     }
 }
 
