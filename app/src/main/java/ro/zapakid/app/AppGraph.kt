@@ -20,6 +20,10 @@ import ro.zapakid.app.auth.PlayIntegrityAttestation
 import ro.zapakid.app.auth.SessionStore
 import ro.zapakid.app.auth.Tls
 import ro.zapakid.app.auth.signin.AppleSignInConfig
+import ro.zapakid.app.family.EncryptedKidSessionStore
+import ro.zapakid.app.family.FamilyApi
+import ro.zapakid.app.family.HttpFamilyApi
+import ro.zapakid.app.family.KidSessionStore
 import ro.zapakid.app.keys.AccountKeys
 import ro.zapakid.app.keys.DeviceRegistrar
 import ro.zapakid.app.keys.DeviceRegistration
@@ -32,6 +36,9 @@ class AppGraph(
     api: AuthApi? = null,
     store: SessionStore? = null,
     ageSignals: AgeSignalsSource? = null,
+    familyApi: FamilyApi? = null,
+    kidStore: KidSessionStore? = null,
+
     private val deviceRegistrar: DeviceRegistrar? = null,
     /** Opens Apple's authorize page. A Custom Tab in the app; tests replace the browser. */
     val openCustomTab: (
@@ -65,6 +72,19 @@ class AppGraph(
             ageSignals = ageSignals ?: PlayAgeSignalsSource(app),
             appleConfig = appleConfig
         )
+    }
+
+    val familyApi: FamilyApi by lazy {
+        familyApi ?: HttpFamilyApi(
+            BuildConfig.API_BASE_URL.toHttpUrl(),
+            http,
+            PlayIntegrityAttestation(app, BuildConfig.PLAY_CLOUD_PROJECT_NUMBER)
+        )
+    }
+
+    /** A paired kid phone's session, encrypted like the parent session. */
+    val kidSessionStore: KidSessionStore by lazy {
+        kidStore ?: EncryptedKidSessionStore(File(app.noBackupFilesDir, "kid-session.bin"), KeystoreBlobCipher())
     }
 
     /** This phone's libsignal records: Keystore-encrypted files in noBackupFilesDir (never backed up). */
