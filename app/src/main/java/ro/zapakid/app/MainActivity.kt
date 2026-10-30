@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import ro.zapakid.app.auth.signin.CustomTabAppleBrowser
@@ -17,6 +19,7 @@ import ro.zapakid.app.ui.AuthViewModel
 import ro.zapakid.app.ui.DeviceSetupViewModel
 import ro.zapakid.app.ui.ZapaKidApp
 import ro.zapakid.app.ui.theme.ZapaKidTheme
+import ro.zapakid.app.ui.theme.roleFor
 
 class MainActivity : ComponentActivity() {
     private val graph get() = (application as ZapaKidApplication).graph
@@ -46,7 +49,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ZapaKidTheme {
+            val kidState by kidViewModel.state.collectAsStateWithLifecycle()
+            ZapaKidTheme(role = roleFor(kidState)) {
                 ZapaKidApp(
                     authViewModel,
                     deviceSetup,
